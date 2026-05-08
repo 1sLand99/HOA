@@ -93,7 +93,7 @@ fi
 
 echo "Using sample from: $ABC_SRC"
 
-ASSETS_DIR="$PROJECT_DIR/app/src/main/assets/arkui-x/entry"
+ASSETS_DIR="$PROJECT_DIR/app/src/main/assets/arkui-x/dynamicHap"
 mkdir -p "$ASSETS_DIR/ets"
 mkdir -p "$ASSETS_DIR/resources/base/profile"
 

@@ -12,14 +12,14 @@ class HoaApplication : StageApplication() {
         private set
 
     override fun onCreate() {
-        Log.i(TAG, "========== HOA Application onCreate START ==========")
-        Log.i(TAG, "Process: ${android.os.Process.myPid()}")
-        Log.i(TAG, "ABI: ${android.os.Build.SUPPORTED_ABIS.toList()}")
+        Log.e(TAG, "========== HOA Application onCreate START ==========")
+        Log.e(TAG, "Process: ${android.os.Process.myPid()}")
+        Log.e(TAG, "ABI: ${android.os.Build.SUPPORTED_ABIS.toList()}")
 
         // Try explicit native library load first for better error reporting
         try {
             System.loadLibrary("arkui_android")
-            Log.i(TAG, "System.loadLibrary(\"arkui_android\") — SUCCESS")
+            Log.e(TAG, "System.loadLibrary(\"arkui_android\") — SUCCESS")
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "System.loadLibrary(\"arkui_android\") — FAILED", e)
             Log.e(TAG, "  nativeLibraryDir: ${applicationInfo.nativeLibraryDir}")
@@ -31,7 +31,7 @@ class HoaApplication : StageApplication() {
         try {
             super.onCreate()
             initSuccess = true
-            Log.i(TAG, "StageApplication.onCreate() completed successfully")
+            Log.e(TAG, "StageApplication.onCreate() completed successfully")
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "FATAL: UnsatisfiedLinkError during StageApplication.onCreate()", e)
             initError = e
@@ -51,7 +51,7 @@ class HoaApplication : StageApplication() {
             Log.e(TAG, "Stage 1 verifier crashed", e)
         }
 
-        Log.i(TAG, "========== HOA Application onCreate END ==========")
+        Log.e(TAG, "========== HOA Application onCreate END ==========")
     }
 
     companion object {

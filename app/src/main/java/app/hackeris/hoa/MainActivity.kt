@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateRuntimeStatus()
-        Log.i(TAG, "========== HOA MainActivity START ==========")
+        Log.e(TAG, "========== HOA MainActivity START ==========")
     }
 
     override fun onResume() {
@@ -74,9 +74,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val assetItems = listOf(
-            "arkui-x/entry/ets/modules.abc",
-            "arkui-x/entry/module.json",
-            "arkui-x/entry/resources.index"
+            "arkui-x/dynamicHap/ets/modules.abc",
+            "arkui-x/dynamicHap/module.json",
+            "arkui-x/dynamicHap/resources.index"
         )
         val allAssetsPresent = assetItems.all { item ->
             try { assets.open(item).close(); true } catch (_: Exception) { false }
@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchHap(hap: InstalledHap) {
-        Log.i(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility}")
+        Log.e(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility}")
         val intent = Intent(this, HoaAbilityActivity::class.java).apply {
             putExtra("BUNDLE_NAME", hap.bundleName)
             putExtra("MODULE_NAME", hap.moduleName)

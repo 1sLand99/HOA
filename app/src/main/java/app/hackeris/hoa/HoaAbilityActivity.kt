@@ -8,13 +8,13 @@ class HoaAbilityActivity : StageActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val bundleName = intent.getStringExtra("BUNDLE_NAME") ?: "com.example.enjoyarkuix"
-        val moduleName = intent.getStringExtra("MODULE_NAME") ?: "entry"
+        val moduleName = intent.getStringExtra("MODULE_NAME") ?: "dynamicHap"
         val abilityName = intent.getStringExtra("ABILITY_NAME") ?: "DynamicHapAbility"
 
         val instanceName = "$bundleName:$moduleName:$abilityName:"
-        Log.i(TAG, "========== HoaAbilityActivity onCreate START ==========")
-        Log.i(TAG, "bundleName=$bundleName, moduleName=$moduleName, abilityName=$abilityName")
-        Log.i(TAG, "instanceName=$instanceName")
+        Log.e(TAG, "========== HoaAbilityActivity onCreate START ==========")
+        Log.e(TAG, "bundleName=$bundleName, moduleName=$moduleName, abilityName=$abilityName")
+        Log.e(TAG, "instanceName=$instanceName")
 
         // Check if StageApplication init succeeded
         val app = applicationContext as? HoaApplication
@@ -23,44 +23,72 @@ class HoaAbilityActivity : StageActivity() {
             Log.e(TAG, "  Error was: ${app.initError?.message}")
         }
 
+        // Verify module exists before handing off to ArkUI-X runtime.
+        // If the module is not found, the runtime creates a null stage and crashes
+        // with StackOverflow in WindowViewSurface.onHoverEvent.
+        if (!moduleExists(bundleName, moduleName)) {
+            Log.e(TAG, "Module not found: bundleName=$bundleName, moduleName=$moduleName")
+            Log.e(TAG, "  Checked: assets/arkui-x/$moduleName/ and filesDir/arkui-x/$bundleName.$moduleName/")
+            android.widget.Toast.makeText(this, "Module not found: $bundleName/$moduleName", android.widget.Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
         try {
             setInstanceName(instanceName)
-            Log.i(TAG, "setInstanceName() OK")
+            Log.e(TAG, "setInstanceName() OK")
         } catch (e: Exception) {
             Log.e(TAG, "setInstanceName() FAILED", e)
         }
 
         try {
             super.onCreate(savedInstanceState)
-            Log.i(TAG, "super.onCreate() completed — ArkUI rendering surface should be created")
-            Log.i(TAG, "instanceId=${getInstanceId()}, instanceName=${getInstanceName()}")
+            Log.e(TAG, "super.onCreate() completed — ArkUI rendering surface should be created")
+            Log.e(TAG, "instanceId=${getInstanceId()}, instanceName=${getInstanceName()}")
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "FATAL: Native library link error during Activity onCreate", e)
         } catch (e: Exception) {
             Log.e(TAG, "ERROR: Activity onCreate failed", e)
         }
 
-        Log.i(TAG, "========== HoaAbilityActivity onCreate END ==========")
+        Log.e(TAG, "========== HoaAbilityActivity onCreate END ==========")
     }
 
     override fun onResume() {
-        Log.i(TAG, "onResume — UIAbility.onForeground() should fire")
+        Log.e(TAG, "onResume — UIAbility.onForeground() should fire")
         super.onResume()
     }
 
     override fun onPause() {
-        Log.i(TAG, "onPause — UIAbility.onBackground() should fire")
+        Log.e(TAG, "onPause — UIAbility.onBackground() should fire")
         super.onPause()
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "onDestroy — UIAbility.onDestroy() should fire")
+        Log.e(TAG, "onDestroy — UIAbility.onDestroy() should fire")
         super.onDestroy()
     }
 
     override fun onBackPressed() {
-        Log.i(TAG, "onBackPressed")
+        Log.e(TAG, "onBackPressed")
         super.onBackPressed()
+    }
+
+    private fun moduleExists(bundleName: String, moduleName: String): Boolean {
+        // Check APK assets: assets/arkui-x/$moduleName/
+        val assetDir = "arkui-x/$moduleName"
+        try {
+            assets.list(assetDir)?.let { files ->
+                if (files.isNotEmpty()) return true
+            }
+        } catch (_: Exception) { }
+
+        // Check app data dir: filesDir/arkui-x/$bundleName.$moduleName/
+        val fullName = "$bundleName.$moduleName"
+        val dynamicDir = java.io.File(filesDir, "arkui-x/$fullName")
+        if (dynamicDir.isDirectory && dynamicDir.listFiles()?.isNotEmpty() == true) return true
+
+        return false
     }
 
     companion object {

@@ -17,7 +17,7 @@ object Stage1Verifier {
 
     fun runAll(context: Context): List<CheckResult> {
         val results = mutableListOf<CheckResult>()
-        Log.i(TAG, "===== Stage 1 Verification START =====")
+        Log.e(TAG, "===== Stage 1 Verification START =====")
 
         results += checkNativeLibs(context)
         results += checkNativeLibSizes(context)
@@ -33,7 +33,7 @@ object Stage1Verifier {
         val total = results.size
         val failed = results.filter { !it.passed }
 
-        Log.i(TAG, "===== Stage 1 Verification: $passed/$total PASSED =====")
+        Log.e(TAG, "===== Stage 1 Verification: $passed/$total PASSED =====")
         if (failed.isNotEmpty()) {
             Log.w(TAG, "Failed checks:")
             failed.forEach { Log.w(TAG, "  FAIL: ${it.name} — ${it.detail}") }
@@ -50,7 +50,7 @@ object Stage1Verifier {
             "libarkui_focuscontroller.so"
         )
         val nativeLibDir = context.applicationInfo.nativeLibraryDir
-        Log.i(TAG, "nativeLibraryDir: $nativeLibDir")
+        Log.e(TAG, "nativeLibraryDir: $nativeLibDir")
 
         return requiredLibs.map { lib ->
             val file = File(nativeLibDir, lib)
@@ -83,9 +83,9 @@ object Stage1Verifier {
 
     private fun checkAssetFiles(context: Context): List<CheckResult> {
         val requiredAssets = listOf(
-            "arkui-x/entry/ets/modules.abc",
-            "arkui-x/entry/module.json",
-            "arkui-x/entry/resources.index"
+            "arkui-x/dynamicHap/ets/modules.abc",
+            "arkui-x/dynamicHap/module.json",
+            "arkui-x/dynamicHap/resources.index"
         )
         return requiredAssets.map { path ->
             val exists = try {
@@ -104,7 +104,7 @@ object Stage1Verifier {
 
     private fun checkAbcBytecode(context: Context): CheckResult {
         try {
-            context.assets.open("arkui-x/entry/ets/modules.abc").use { input ->
+            context.assets.open("arkui-x/dynamicHap/ets/modules.abc").use { input ->
                 val header = ByteArray(16)
                 val read = input.read(header)
                 if (read < 16) {
@@ -141,7 +141,7 @@ object Stage1Verifier {
 
     private fun checkModuleJson(context: Context): CheckResult {
         try {
-            context.assets.open("arkui-x/entry/module.json").bufferedReader().use { reader ->
+            context.assets.open("arkui-x/dynamicHap/module.json").bufferedReader().use { reader ->
                 val json = reader.readText()
                 val root = org.json.JSONObject(json)
                 val moduleObj = root.optJSONObject("module")
@@ -167,7 +167,7 @@ object Stage1Verifier {
 
     private fun checkResourcesIndex(context: Context): CheckResult {
         try {
-            context.assets.open("arkui-x/entry/resources.index").use { input ->
+            context.assets.open("arkui-x/dynamicHap/resources.index").use { input ->
                 val size = input.available()
                 val reasonable = size > 1000
                 return CheckResult(

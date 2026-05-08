@@ -27,9 +27,9 @@ I/HOA.Main:   libhilog.so: FOUND
 I/HOA.Main:   libarkui_componentsnapshot.so: FOUND
 I/HOA.Main:   libarkui_focuscontroller.so: FOUND
 I/HOA.Main: Asset check:
-I/HOA.Main:   arkui-x/entry/ets/modules.abc: FOUND
-I/HOA.Main:   arkui-x/entry/module.json: FOUND
-I/HOA.Main:   arkui-x/entry/resources.index: FOUND
+I/HOA.Main:   arkui-x/dynamicHap/ets/modules.abc: FOUND
+I/HOA.Main:   arkui-x/dynamicHap/module.json: FOUND
+I/HOA.Main:   arkui-x/dynamicHap/resources.index: FOUND
 I/HOA.Main: ========== HOA MainActivity END ==========
 ```
 
@@ -122,9 +122,9 @@ I/HOA.Verify: ===== Stage 1 Verification: 10/10 PASSED =====
 | 3 | `NativeLib/libarkui_componentsnapshot.so` | 文件存在于 nativeLibraryDir | jniLibs 中缺失 |
 | 4 | `NativeLib/libarkui_focuscontroller.so` | 文件存在于 nativeLibraryDir | jniLibs 中缺失 |
 | 5 | `NativeLibSize/libarkui_android.so` | 文件大小 > 50 MB | 文件过小 — 可能损坏或复制了错误文件 |
-| 6 | `Asset/arkui-x/entry/ets/modules.abc` | 存在于 APK assets 中 | 未运行 setup-runtime.sh |
-| 7 | `Asset/arkui-x/entry/module.json` | 存在于 APK assets 中 | 未运行 setup-runtime.sh |
-| 8 | `Asset/arkui-x/entry/resources.index` | 存在于 APK assets 中 | 未运行 setup-runtime.sh |
+| 6 | `Asset/arkui-x/dynamicHap/ets/modules.abc` | 存在于 APK assets 中 | 未运行 setup-runtime.sh |
+| 7 | `Asset/arkui-x/dynamicHap/module.json` | 存在于 APK assets 中 | 未运行 setup-runtime.sh |
+| 8 | `Asset/arkui-x/dynamicHap/resources.index` | 存在于 APK assets 中 | 未运行 setup-runtime.sh |
 | 9 | `AbcBytecode` | PANDA 魔数 + 版本号 10–13 | .abc 文件错误或字节码版本不兼容 |
 | 10 | `ModuleJson` | 合法 JSON，包含 `module.name` 和 `module.type` | module.json 缺失或损坏 |
 | 11 | `ResourcesIndex` | 大小 > 1000 字节 | resources.index 为空或损坏 |
