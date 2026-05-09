@@ -124,3 +124,85 @@
 -#include "verification/verifier_messages_data_gen.cpp"
 +// NOTE: include path adapted for hand-written build (original: "verification/")
 +#include "verifier_messages_data_gen.cpp"
+diff --git arkcompiler_runtime_core/static_core/isa/combine.rb arkcompiler_runtime_core/static_core/isa/combine.rb
+index f311a8e4..bd69be4a 100755
+--- arkcompiler_runtime_core/static_core/isa/combine.rb
++++ arkcompiler_runtime_core/static_core/isa/combine.rb
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env ruby
++require 'ostruct'
+ # Copyright (c) 2021-2024 Huawei Device Co., Ltd.
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+diff --git arkcompiler_runtime_core/static_core/isa/gen.rb arkcompiler_runtime_core/static_core/isa/gen.rb
+index 66827e00..d65c926d 100755
+--- arkcompiler_runtime_core/static_core/isa/gen.rb
++++ arkcompiler_runtime_core/static_core/isa/gen.rb
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env ruby
++require 'ostruct'
+ # Copyright (c) 2021-2024 Huawei Device Co., Ltd.
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+diff --git arkcompiler_runtime_core/static_core/isa/isapi.rb arkcompiler_runtime_core/static_core/isa/isapi.rb
+index 6b0b6c4a..91143a23 100755
+--- arkcompiler_runtime_core/static_core/isa/isapi.rb
++++ arkcompiler_runtime_core/static_core/isa/isapi.rb
+@@ -1,4 +1,5 @@
+ # Copyright (c) 2021-2024 Huawei Device Co., Ltd.
++require 'ostruct'
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+ # You may obtain a copy of the License at
+diff --git arkcompiler_runtime_core/static_core/libpandabase/templates/logger_gen.rb arkcompiler_runtime_core/static_core/libpandabase/templates/logger_gen.rb
+index 2ad8c964..52978916 100755
+--- arkcompiler_runtime_core/static_core/libpandabase/templates/logger_gen.rb
++++ arkcompiler_runtime_core/static_core/libpandabase/templates/logger_gen.rb
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env ruby
++require 'ostruct'
+ # Copyright (c) 2021-2024 Huawei Device Co., Ltd.
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+diff --git arkcompiler_runtime_core/static_core/runtime/templates/gen_intrinsics_data.rb arkcompiler_runtime_core/static_core/runtime/templates/gen_intrinsics_data.rb
+index 4c22fae9..04d0407c 100755
+--- arkcompiler_runtime_core/static_core/runtime/templates/gen_intrinsics_data.rb
++++ arkcompiler_runtime_core/static_core/runtime/templates/gen_intrinsics_data.rb
+@@ -15,6 +15,7 @@
+ # Huawei Technologies Co.,Ltd.
+ 
+ require 'optparse'
++require 'ostruct'
+ require 'yaml'
+ require 'json'
+ require 'erb'
+diff --git arkcompiler_runtime_core/static_core/templates/common.rb arkcompiler_runtime_core/static_core/templates/common.rb
+index 3a99fc33..cff22323 100755
+--- arkcompiler_runtime_core/static_core/templates/common.rb
++++ arkcompiler_runtime_core/static_core/templates/common.rb
+@@ -1,4 +1,5 @@
+ # Copyright (c) 2021-2024 Huawei Device Co., Ltd.
++require 'ostruct'
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+ # You may obtain a copy of the License at
+diff --git arkcompiler_runtime_core/static_core/templates/merge.rb arkcompiler_runtime_core/static_core/templates/merge.rb
+index 9fe381af..64b0459e 100755
+--- arkcompiler_runtime_core/static_core/templates/merge.rb
++++ arkcompiler_runtime_core/static_core/templates/merge.rb
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env ruby
++require 'ostruct'
+ # Copyright (c) 2022-2024 Huawei Device Co., Ltd.
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+diff --git arkcompiler_runtime_core/static_core/templates/plugin_options.rb arkcompiler_runtime_core/static_core/templates/plugin_options.rb
+index 59a5780f..eb4cbfcf 100755
+--- arkcompiler_runtime_core/static_core/templates/plugin_options.rb
++++ arkcompiler_runtime_core/static_core/templates/plugin_options.rb
+@@ -1,4 +1,5 @@
+ # Copyright (c) 2021-2024 Huawei Device Co., Ltd.
++require 'ostruct'
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+ # You may obtain a copy of the License at

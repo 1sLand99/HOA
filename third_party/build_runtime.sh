@@ -20,6 +20,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 SRC_ROOT="${SCRIPT_DIR}/arkcompiler_runtime_core/static_core"
+THIRD_PARTY="${SRC_ROOT}/third_party"
 BUILD_GEN="${SCRIPT_DIR}/build_gen"
 BUILD_ANDROID="${SCRIPT_DIR}/build_android"
 
@@ -92,6 +93,15 @@ do_patch() {
         log_error "Patch application failed"
         exit 1
     }
+    # Fix inst_templates.yaml: replace ets-only file with symlink to full template
+    # (Patch can't represent symlinks, so handle it explicitly)
+    local its="${SRC_ROOT}/compiler/optimizer/templates/inst_templates.yaml"
+    if [ -f "${its}" ] && [ ! -L "${its}" ]; then
+        mv "${its}" "${its}.bak"
+        ln -sf ../ir_builder/inst_templates.yaml "${its}"
+        log_info "  inst_templates.yaml -> symlink to ir_builder/inst_templates.yaml"
+    fi
+
     # Add marker to patched files so we can detect re-application
     for f in \
         compiler/optimizer/code_generator/encode_visitor.cpp \
@@ -462,7 +472,7 @@ ICUEOF
         -o "${GEN_BASE}/shorty_values.h" \
         -q "${SRC_ROOT}/libpandafile/types.rb"
 
-    # Stage 8: Plugin defines + IR dyn base types + cross_values + entrypoints + profiling
+    # Stage 8: Plugin defines + IR dyn base types + entrypoints + profiling + assembler codegen
     log_info "Stage 8: Generating plugin/compiler/runtime headers..."
     mkdir -p "${BUILD_GEN}/cross_values"
 
@@ -579,132 +589,8 @@ ICUEOF
         --output "${BUILD_GEN}/compiler/entrypoints_compiler_checksum.inl" \
         "${BUILD_GEN}/cross_values"
 
-    # 8f: Generate cross_values headers (or stubs)
-    log_info "  8f: Generating cross_values headers..."
-    # ... (continues below)
-    mkdir -p "${BUILD_GEN}/cross_values/generated_values"
-    CV_GEN_DIR="${BUILD_GEN}/cross_values/generated_values"
-    CV_VALUES="${CV_GEN_DIR}/AARCH64_values_gen.h"
-    CV_UMBRELLA="${BUILD_GEN}/cross_values/cross_values.h"
-
-    # Try real cross-compilation first
-    NDK_CXX="${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android27-clang++"
-    # Fall back to aarch64-linux-android27-clang++ for cross-values generation
-    CV_COMPILED=false
-    if command -v "${NDK_CXX}" &>/dev/null; then
-        ASM_DEF_SRC="${SRC_ROOT}/runtime/asm_defines/defines.cpp"
-        ASM_OUT="${BUILD_GEN}/cross_values/libasm_defines.S"
-        if ${NDK_CXX} -S -std=c++17 \
-            --target=aarch64-linux-android26 \
-            -DPANDA_TARGET_ARM64 -DPANDA_TARGET_64 -DPANDA_BUILD \
-            -DPANDA_PRODUCT_BUILD -DPANDA_TARGET_MOBILE -DPANDA_TARGET_UNIX \
-            -DPANDA_USE_FUTEX -DPANDA_USE_32_BIT_POINTER \
-            -Wno-invalid-offsetof \
-            -I"${SRC_ROOT}" \
-            -I"${SRC_ROOT}/runtime" \
-            -I"${SRC_ROOT}/libpandabase" \
-            -I"${SRC_ROOT}/libpandafile" \
-            -I"${THIRD_PARTY}/utils_native/base/include" \
-            -I"${BUILD_GEN}/generated" \
-            -I"${BUILD_GEN}/libpandabase/generated" \
-            -I"${BUILD_GEN}/libpandafile/include" \
-            -I"${BUILD_GEN}/panda_gen_options/generated" \
-            -I"${BUILD_GEN}/panda_gen_options" \
-            -I"${BUILD_GEN}/runtime/asm_defines" \
-            -I"${BUILD_GEN}/runtime/include" \
-            -I"${BUILD_GEN}/runtime" \
-            -I"${BUILD_GEN}/compiler" \
-            -I"${BUILD_GEN}/cross_values" \
-            -I"${BUILD_GEN}" \
-            -I"${SRC_ROOT}/plugins/ets" \
-            -o "${ASM_OUT}" \
-            "${ASM_DEF_SRC}" 2>/dev/null; then
-            log_info "    defines.cpp compiled to assembly OK"
-            # Generate asm_defines.h from same assembly output
-            ruby "${SRC_ROOT}/runtime/asm_defines/defines_generator.rb" \
-                "${ASM_OUT}" "${GEN_INC}/asm_defines.h" 2>/dev/null
-            log_info "    asm_defines.h generated"
-            # Generate cross_values
-            ruby "${SRC_ROOT}/cross_values/cross_values_generator.rb" \
-                "${ASM_OUT}" "${CV_VALUES}" "AARCH64"
-            ruby "${SRC_ROOT}/cross_values/cross_values_getters_generator.rb" \
-                "${ASM_OUT}" "${CV_GEN_DIR}" "${CV_UMBRELLA}" 2>/dev/null
-            if [ -s "${CV_UMBRELLA}" ]; then
-                CV_COMPILED=true
-                log_info "    cross_values generated OK"
-            fi
-        fi
-    fi
-
-    if [ "$CV_COMPILED" = false ]; then
-        log_warn "    Using cross_values stubs (JIT disabled, values not used at runtime)"
-        # Generate stubs from the .def files
-        ruby -e '
-            CV_VALUES = ARGV[0]
-            CV_UMBRELLA = ARGV[1]
-            def_files = ARGV[2..]
-            names = []
-            types = {}
-            def_files.each do |f|
-                next unless File.exist?(f)
-                content = File.read(f)
-                content.scan(/DEFINE_VALUE\s*\(\s*(\w+)\s*,/).each { |m| names << m[0] }
-                content.scan(/DEFINE_VALUE_WITH_TYPE\s*\(\s*(\w+)\s*,.*,\s*([a-z_][\w_]*)\s*\)\s*$/).each { |m|
-                    names << m[0]
-                    types[m[0]] = m[1]
-                }
-            end
-            names.uniq!
-            names.sort!
-
-            # Generate AARCH64_values_gen.h
-            File.open(CV_VALUES, "w") do |f|
-                f.puts "// Autogenerated stub -- JIT codegen disabled"
-                f.puts "#ifndef CROSS_VALUES_GENERATED_VALUES_AARCH64_VALUES_GEN_H"
-                f.puts "#define CROSS_VALUES_GENERATED_VALUES_AARCH64_VALUES_GEN_H"
-                f.puts "namespace ark::cross_values::AARCH64 {"
-                names.each do |n|
-                    t = types[n] || "ptrdiff_t"
-                    f.puts "static constexpr #{t} #{n}_VAL = 0;"
-                end
-                f.puts "}  // namespace ark::cross_values::AARCH64"
-                f.puts "#endif"
-            end
-
-            # Generate cross_values.h umbrella
-            File.open(CV_UMBRELLA, "w") do |f|
-                f.puts "// Autogenerated stub -- JIT codegen disabled"
-                f.puts "#ifndef CROSS_VALUES_CROSS_VALUES_H"
-                f.puts "#define CROSS_VALUES_CROSS_VALUES_H"
-                f.puts "#include \"generated_values/AARCH64_values_gen.h\""
-                f.puts "#include <cstddef>"
-                f.puts "#include \"libpandabase/utils/arch.h\""
-                f.puts "namespace ark::cross_values {"
-                names.each do |n|
-                    t = types[n] || "ptrdiff_t"
-                    pascal = n.split("_").collect(&:capitalize).join
-                    f.puts "[[maybe_unused]] static constexpr #{t} Get#{pascal}(Arch arch) {"
-                    f.puts "    return cross_values::AARCH64::#{n}_VAL;"
-                    f.puts "}"
-                end
-                # Add GetManagedThreadEntrypointOffset (needed by compiler)
-                f.puts ""
-                f.puts "// Specific getter for TLS entrypoints offsets:"
-                f.puts "[[maybe_unused]] inline ptrdiff_t GetManagedThreadEntrypointOffset(Arch arch, size_t id)"
-                f.puts "{"
-                f.puts "    return GetManagedThreadEntrypointsOffset(arch) + id * PointerSize(arch);"
-                f.puts "}"
-                f.puts "}  // namespace ark::cross_values"
-                f.puts "#endif"
-            end
-            puts "    stub: #{names.size} values generated"
-        ' "${CV_VALUES}" "${CV_UMBRELLA}" \
-            "${SRC_ROOT}/runtime/asm_defines/asm_defines.def" \
-            "${SRC_ROOT}/plugins/ets/runtime/asm_defines/asm_defines.def"
-    fi
-
-    # Stage 8g: Assembler codegen (ISA templates + meta_gen headers)
-    log_info "  8g: Generating assembler codegen files..."
+    # Stage 8f: Assembler codegen (ISA templates + meta_gen headers)
+    log_info "  8f: Generating assembler codegen files..."
     mkdir -p "${BUILD_GEN}/assembler"
 
     # ISA-based templates (isa.h, ins_emit.h, ins_to_string.cpp, etc.)
@@ -819,6 +705,128 @@ ICUEOF
         --template "${SRC_ROOT}/runtime/entrypoints/plugins_entrypoints_gen.h.erb" \
         --output "${GEN_INC}/plugins_entrypoints_gen.h" 2>/dev/null && true
     log_info "  Runtime plugin headers generated"
+
+    # Stage 12b: Generate asm_defines.h + cross_values
+    # NOTE: Must run AFTER Stages 11-12 which generate intrinsics_enum.h, language_config_gen.inc
+    #
+    # asm_defines.h is generated from actual ARM64 assembly output (real offset values for
+    # hand-written .S files). cross_values.h always uses stubs (all getter functions with 0
+    # values), matching HongEngine — JIT is disabled, so JIT codegen doesn't use these values.
+    log_info "Stage 12b: Generating asm_defines.h + cross_values..."
+    mkdir -p "${BUILD_GEN}/cross_values/generated_values"
+    CV_GEN_DIR="${BUILD_GEN}/cross_values/generated_values"
+    CV_VALUES="${CV_GEN_DIR}/AARCH64_values_gen.h"
+    CV_UMBRELLA="${BUILD_GEN}/cross_values/cross_values.h"
+
+    NDK_CXX="${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android27-clang++"
+    if command -v "${NDK_CXX}" &>/dev/null; then
+        ASM_DEF_SRC="${SRC_ROOT}/runtime/asm_defines/defines.cpp"
+        ASM_OUT="${BUILD_GEN}/cross_values/libasm_defines.S"
+        if ${NDK_CXX} -S -std=c++17 \
+            --target=aarch64-linux-android26 \
+            -DPANDA_TARGET_ARM64 -DPANDA_TARGET_64 -DPANDA_BUILD \
+            -DPANDA_PRODUCT_BUILD -DPANDA_TARGET_MOBILE -DPANDA_TARGET_UNIX \
+            -DPANDA_USE_FUTEX -DPANDA_USE_32_BIT_POINTER \
+            -Wno-invalid-offsetof \
+            -I"${SRC_ROOT}" \
+            -I"${SRC_ROOT}/runtime" \
+            -I"${SRC_ROOT}/libpandabase" \
+            -I"${SRC_ROOT}/libpandafile" \
+            -I"${THIRD_PARTY}/utils_native/base/include" \
+            -I"${BUILD_GEN}/generated" \
+            -I"${BUILD_GEN}/libpandabase/generated" \
+            -I"${BUILD_GEN}/libpandafile/include" \
+            -I"${BUILD_GEN}/panda_gen_options/generated" \
+            -I"${BUILD_GEN}/panda_gen_options" \
+            -I"${BUILD_GEN}/runtime/asm_defines" \
+            -I"${BUILD_GEN}/runtime/include" \
+            -I"${BUILD_GEN}/runtime" \
+            -I"${BUILD_GEN}/compiler" \
+            -I"${BUILD_GEN}/cross_values" \
+            -I"${BUILD_GEN}" \
+            -I"${SRC_ROOT}/plugins/ets" \
+            -o "${ASM_OUT}" \
+            "${ASM_DEF_SRC}" 2>/dev/null; then
+            log_info "    defines.cpp compiled OK"
+            # Generate asm_defines.h from assembly output (real offset values)
+            ruby "${SRC_ROOT}/runtime/asm_defines/defines_generator.rb" \
+                "${ASM_OUT}" "${GEN_INC}/asm_defines.h" 2>/dev/null
+            log_info "    asm_defines.h generated (real values)"
+            # Also generate AARCH64_values_gen.h with real values
+            ruby "${SRC_ROOT}/cross_values/cross_values_generator.rb" \
+                "${ASM_OUT}" "${CV_VALUES}" "AARCH64" 2>/dev/null && \
+                log_info "    AARCH64_values_gen.h generated (real values)"
+        else
+            log_warn "    defines.cpp compilation failed, using stubs for asm_defines.h"
+            touch "${GEN_INC}/asm_defines.h"
+        fi
+    fi
+
+    # Always use stub cross_values.h — the real version from cross_values_getters_generator.rb
+    # only has GetManagedThreadEntrypointOffset, but runtime_interface.h needs 178+ getters.
+    log_info "    Generating cross_values.h stub (all getter functions)..."
+    ruby -e '
+        CV_VALUES = ARGV[0]
+        CV_UMBRELLA = ARGV[1]
+        def_files = ARGV[2..]
+        names = []
+        types = {}
+        def_files.each do |f|
+            next unless File.exist?(f)
+            content = File.read(f)
+            content.scan(/DEFINE_VALUE\s*\(\s*(\w+)\s*,/).each { |m| names << m[0] }
+            content.scan(/DEFINE_VALUE_WITH_TYPE\s*\(\s*(\w+)\s*,.*,\s*([a-z_][\w_]*)\s*\)\s*$/).each { |m|
+                names << m[0]
+                types[m[0]] = m[1]
+            }
+        end
+        names.uniq!
+        names.sort!
+
+        # Only write AARCH64_values_gen.h if it does not already have real values
+        if !File.exist?(CV_VALUES) || File.read(CV_VALUES).include?("Autogenerated stub")
+            File.open(CV_VALUES, "w") do |f|
+                f.puts "// Autogenerated stub -- JIT codegen disabled"
+                f.puts "#ifndef CROSS_VALUES_GENERATED_VALUES_AARCH64_VALUES_GEN_H"
+                f.puts "#define CROSS_VALUES_GENERATED_VALUES_AARCH64_VALUES_GEN_H"
+                f.puts "namespace ark::cross_values::AARCH64 {"
+                names.each do |n|
+                    t = types[n] || "ptrdiff_t"
+                    f.puts "static constexpr #{t} #{n}_VAL = 0;"
+                end
+                f.puts "}  // namespace ark::cross_values::AARCH64"
+                f.puts "#endif"
+            end
+        end
+
+        File.open(CV_UMBRELLA, "w") do |f|
+            f.puts "// Autogenerated stub -- JIT codegen disabled"
+            f.puts "#ifndef CROSS_VALUES_CROSS_VALUES_H"
+            f.puts "#define CROSS_VALUES_CROSS_VALUES_H"
+            f.puts "#include \"generated_values/AARCH64_values_gen.h\""
+            f.puts "#include <cstddef>"
+            f.puts "#include \"libpandabase/utils/arch.h\""
+            f.puts "namespace ark::cross_values {"
+            names.each do |n|
+                t = types[n] || "ptrdiff_t"
+                pascal = n.split("_").collect(&:capitalize).join
+                f.puts "[[maybe_unused]] static constexpr #{t} Get#{pascal}(Arch arch) {"
+                f.puts "    return cross_values::AARCH64::#{n}_VAL;"
+                f.puts "}"
+            end
+            f.puts ""
+            f.puts "// Specific getter for TLS entrypoints offsets:"
+            f.puts "[[maybe_unused]] inline ptrdiff_t GetManagedThreadEntrypointOffset(Arch arch, size_t id)"
+            f.puts "{"
+            f.puts "    return GetManagedThreadEntrypointsOffset(arch) + id * PointerSize(arch);"
+            f.puts "}"
+            f.puts "}  // namespace ark::cross_values"
+            f.puts "#endif"
+        end
+        puts "    stub: #{names.size} getter functions generated"
+    ' "${CV_VALUES}" "${CV_UMBRELLA}" \
+        "${SRC_ROOT}/runtime/asm_defines/asm_defines.def" \
+        "${SRC_ROOT}/plugins/ets/runtime/asm_defines/asm_defines.def"
 
     # Stage 13: Verification generated headers
     log_info "Stage 13: Generating verification headers..."
