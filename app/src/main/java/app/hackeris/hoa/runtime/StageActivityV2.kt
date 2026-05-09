@@ -8,6 +8,8 @@ import android.view.SurfaceView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipFile
 
 /**
  * StageActivityV2 — hosts the self-built OpenHarmony runtime (HongEngine-based).
@@ -39,6 +41,15 @@ class StageActivityV2 : AppCompatActivity(), SurfaceHolder.Callback {
             "hongengine_c",     // C API wrapper
             "hongengine"        // JNI bridge (compiled by CMake)
         )
+
+        // Entry point candidates to try (in order) for ES module HAPs.
+        // The first one that resolves wins.
+        private val ENTRY_POINT_CANDIDATES = listOf(
+            "NONEXISTENT::nonexistent",           // deliberately invalid — test if resolution works
+            "entry.ETSGLOBAL::func_main_0",
+            "entry/src/main/ets/entryability/EntryAbility.ETSGLOBAL::func_main_0",
+            "_GLOBAL::func_main_0",
+        )
     }
 
     private var nativeState: Long = 0
@@ -55,6 +66,9 @@ class StageActivityV2 : AppCompatActivity(), SurfaceHolder.Callback {
 
         // Extract test ABC + ICU data from assets
         extractRuntimeAssets()
+
+        // Extract HAP if path provided
+        extractHapIfPresent()
 
         // Create SurfaceView for future ACE rendering
         surfaceView = SurfaceView(this).also {
@@ -125,10 +139,20 @@ class StageActivityV2 : AppCompatActivity(), SurfaceHolder.Callback {
             // Find the ABC file
             val abcFile = findAbcFile(bundleName, moduleName)
             if (abcFile != null) {
-                val result = nativeRunPage(nativeState, bundleName, abilityName, abcFile.absolutePath)
-                Log.e(TAG, "nativeRunPage result: $result")
-                if (result != "OK") {
-                    Toast.makeText(this, "Runtime error: $result", Toast.LENGTH_LONG).show()
+                val isHapModule = (abcFile.name == "modules.abc")
+
+                // Step 1: Create runtime (executes default _GLOBAL::main — expected to fail for HAP)
+                val firstResult = nativeRunPage(nativeState, bundleName, abilityName,
+                                               abcFile.absolutePath, null)
+                Log.e(TAG, "nativeRunPage (default entry) result: $firstResult")
+
+                // Step 2: If HAP module, try ES module entry points
+                if (isHapModule) {
+                    tryEntryPoints()
+                }
+
+                if (firstResult != "OK") {
+                    Toast.makeText(this, "Default entry failed. Check logcat.", Toast.LENGTH_LONG).show()
                 }
             } else {
                 Log.e(TAG, "No ABC file found for $bundleName/$moduleName")
@@ -137,16 +161,93 @@ class StageActivityV2 : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
+    /**
+     * Try each entry point candidate on the already-created VM.
+     */
+    private fun tryEntryPoints() {
+        for (ep in ENTRY_POINT_CANDIDATES) {
+            Log.e(TAG, "Trying entry point: $ep")
+            val result = nativeTryEntryPoint(nativeState, ep)
+            Log.e(TAG, "nativeTryEntryPoint[$ep] result: $result")
+            if (result == "OK") {
+                Log.e(TAG, "Entry point SUCCESS: $ep")
+                Toast.makeText(this, "HAP launched via: $ep", Toast.LENGTH_LONG).show()
+                return
+            }
+        }
+
+        Log.e(TAG, "All entry point candidates failed")
+        Toast.makeText(this, "All entry points failed. Check logcat for details.", Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * Extract a HAP zip to filesDir/hap_extracted/ if HAP_PATH intent extra is set.
+     */
+    private fun extractHapIfPresent() {
+        val hapPath = intent.getStringExtra("HAP_PATH")
+        if (hapPath == null) {
+            Log.e(TAG, "No HAP_PATH intent extra — will look for extracted HAP or test ABC")
+            return
+        }
+
+        val hapFile = File(hapPath)
+        if (!hapFile.isFile) {
+            Log.e(TAG, "HAP file not found: $hapPath")
+            return
+        }
+
+        val destDir = File(filesDir, "hap_extracted")
+        if (destDir.exists() && File(destDir, "ets/modules.abc").isFile) {
+            Log.e(TAG, "HAP already extracted to ${destDir.absolutePath}")
+            return
+        }
+
+        destDir.deleteRecursively()
+        destDir.mkdirs()
+
+        try {
+            ZipFile(hapFile).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    val target = File(destDir, entry.name)
+                    if (entry.isDirectory) {
+                        target.mkdirs()
+                    } else {
+                        target.parentFile?.mkdirs()
+                        zip.getInputStream(entry).use { input ->
+                            FileOutputStream(target).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+                }
+            }
+            val abcFile = File(destDir, "ets/modules.abc")
+            Log.e(TAG, "HAP extracted OK. modules.abc size=${if (abcFile.isFile) abcFile.length() else -1}")
+        } catch (e: Exception) {
+            Log.e(TAG, "HAP extraction failed: ${e.message}")
+        }
+    }
+
     private fun findAbcFile(bundleName: String, moduleName: String): File? {
-        // Check dynamic HAP dir (filesDir/arkui-x/$bundleName.$moduleName/)
+        // 1. Check extracted HAP dir
+        val hapDir = File(filesDir, "hap_extracted")
+        val hapAbc = File(hapDir, "ets/modules.abc")
+        if (hapAbc.isFile) {
+            Log.e(TAG, "Found HAP ABC: ${hapAbc.absolutePath}")
+            return hapAbc
+        }
+
+        // 2. Check dynamic HAP dir (filesDir/arkui-x/$bundleName.$moduleName/)
         val dynamicDir = File(filesDir, "arkui-x/$bundleName.$moduleName")
         val dynamicAbc = File(dynamicDir, "ets/modules.abc")
         if (dynamicAbc.isFile) {
-            Log.e(TAG, "Found ABC: ${dynamicAbc.absolutePath}")
+            Log.e(TAG, "Found dynamic ABC: ${dynamicAbc.absolutePath}")
             return dynamicAbc
         }
 
-        // Check test ABC from assets
+        // 3. Fallback: test hello.abc
         val testAbc = File(filesDir, "test/hello.abc")
         if (testAbc.isFile) {
             Log.e(TAG, "Using test ABC: ${testAbc.absolutePath}")
@@ -215,7 +316,9 @@ class StageActivityV2 : AppCompatActivity(), SurfaceHolder.Callback {
     private external fun nativeSetSurface(ptr: Long, surface: Surface)
     private external fun nativeSurfaceChanged(ptr: Long, width: Int, height: Int)
     private external fun nativeSurfaceDestroyed(ptr: Long)
-    private external fun nativeRunPage(ptr: Long, bundleName: String, abilityName: String, abcPath: String): String
+    private external fun nativeRunPage(ptr: Long, bundleName: String, abilityName: String,
+                                       abcPath: String, entryPoint: String?): String
+    private external fun nativeTryEntryPoint(ptr: Long, entryPoint: String): String
     private external fun nativeDestroy(ptr: Long)
     private external fun nativeOnShow(ptr: Long)
     private external fun nativeOnHide(ptr: Long)

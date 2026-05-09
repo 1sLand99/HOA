@@ -64,10 +64,13 @@ HongEngineError hongengine_ets_create_runtime(HongEngineState* state,
 HongEngineError hongengine_ets_destroy_runtime(HongEngineState* state);
 
 // Execute an ETS module entry point.
-// module_name: the ability/page name (default entry "ETSGLOBAL::main" if empty).
+// module_name: the ability/page name (default entry "_GLOBAL::main" if empty).
+// entry_point: if non-NULL, used as the full entry point string
+//              (e.g. "entry.ETSGLOBAL::func_main_0"), bypassing the default.
 // Returns result with success flag and exit code.
 HongEtsResult hongengine_ets_execute_module(HongEngineState* state,
-                                            const char* module_name);
+                                            const char* module_name,
+                                            const char* entry_point);
 
 // Get the last error message stored in the engine state.
 // Returns a pointer to a null-terminated string, or NULL if no error.

@@ -103,15 +103,17 @@ Java_app_hackeris_hoa_runtime_StageActivityV2_nativeSurfaceDestroyed(
 JNIEXPORT jstring JNICALL
 Java_app_hackeris_hoa_runtime_StageActivityV2_nativeRunPage(
     JNIEnv* env, jclass, jlong ptr,
-    jstring bundleName, jstring abilityName, jstring abcPath) {
+    jstring bundleName, jstring abilityName, jstring abcPath, jstring entryPoint) {
 
     auto* state = GetState(ptr);
 
     const char* bundle = env->GetStringUTFChars(bundleName, nullptr);
     const char* ability = env->GetStringUTFChars(abilityName, nullptr);
     const char* abc = env->GetStringUTFChars(abcPath, nullptr);
+    const char* ep = entryPoint ? env->GetStringUTFChars(entryPoint, nullptr) : nullptr;
 
-    LOGE("nativeRunPage: bundle=%s ability=%s abc=%s", bundle, ability, abc);
+    LOGE("nativeRunPage: bundle=%s ability=%s abc=%s entryPoint=%s",
+         bundle, ability, abc, ep ? ep : "(default)");
 
     // Build stdlib path (etsstdlib.abc must be extracted first)
     char stdlibPath[1024];
@@ -140,12 +142,13 @@ Java_app_hackeris_hoa_runtime_StageActivityV2_nativeRunPage(
         env->ReleaseStringUTFChars(bundleName, bundle);
         env->ReleaseStringUTFChars(abilityName, ability);
         env->ReleaseStringUTFChars(abcPath, abc);
+        if (ep) env->ReleaseStringUTFChars(entryPoint, ep);
         return result;
     }
     LOGE("ETS runtime created OK");
 
     // Execute entry point
-    HongEtsResult result = hongengine_ets_execute_module(state->c_state, nullptr);
+    HongEtsResult result = hongengine_ets_execute_module(state->c_state, nullptr, ep);
     if (result.success) {
         LOGE("ETS module executed OK: exit_code=%d", result.exit_code);
     } else {
@@ -156,9 +159,35 @@ Java_app_hackeris_hoa_runtime_StageActivityV2_nativeRunPage(
     env->ReleaseStringUTFChars(bundleName, bundle);
     env->ReleaseStringUTFChars(abilityName, ability);
     env->ReleaseStringUTFChars(abcPath, abc);
+    if (ep) env->ReleaseStringUTFChars(entryPoint, ep);
 
     if (result.success) return env->NewStringUTF("OK");
     return ErrorToJava(env, result.error ? result.error : "execution failed", HONGENGINE_OK);
+}
+
+// =============================================================================
+// nativeTryEntryPoint — execute a custom entry point on an already-created VM
+// =============================================================================
+JNIEXPORT jstring JNICALL
+Java_app_hackeris_hoa_runtime_StageActivityV2_nativeTryEntryPoint(
+    JNIEnv* env, jclass, jlong ptr, jstring entryPoint) {
+
+    auto* state = GetState(ptr);
+    const char* ep = env->GetStringUTFChars(entryPoint, nullptr);
+
+    LOGE("nativeTryEntryPoint: ep=%s", ep);
+
+    HongEtsResult result = hongengine_ets_execute_module(state->c_state, nullptr, ep);
+    if (result.success) {
+        LOGE("nativeTryEntryPoint OK: exit_code=%d", result.exit_code);
+    } else {
+        LOGE("nativeTryEntryPoint FAILED: %s", result.error ? result.error : "unknown");
+    }
+
+    env->ReleaseStringUTFChars(entryPoint, ep);
+
+    if (result.success) return env->NewStringUTF("OK");
+    return ErrorToJava(env, result.error ? result.error : "entry point failed", HONGENGINE_OK);
 }
 
 // =============================================================================

@@ -9,6 +9,7 @@
 #include <file_items.h>
 
 #include "plugins/ets/runtime/ets_vm_api.h"
+#include "runtime/include/runtime.h"
 #include "runtime/include/runtime_options.h"
 #include "generated/base_options.h"
 
@@ -152,7 +153,8 @@ HongEngineError hongengine_ets_destroy_runtime(HongEngineState* state) {
 }
 
 HongEtsResult hongengine_ets_execute_module(HongEngineState* state,
-                                            const char* module_name) {
+                                            const char* module_name,
+                                            const char* entry_point) {
     HongEtsResult result = {};
     result.success = 0;
     result.exit_code = 1;
@@ -166,6 +168,25 @@ HongEtsResult hongengine_ets_execute_module(HongEngineState* state,
         return result;
     }
 
+    // When entry_point is provided, call Runtime::ExecutePandaFile directly.
+    // This bypasses ExecuteModule's hardcoded "_GLOBAL::main" / ".ETSGLOBAL::main",
+    // allowing ES module entry points like "entry.ETSGLOBAL::func_main_0".
+    if (entry_point != nullptr && entry_point[0] != '\0') {
+        auto *runtime = ark::Runtime::GetCurrent();
+        auto pfPath = runtime->GetPandaFiles()[0];
+        LOG(INFO, RUNTIME) << "ExecuteModule custom: '" << pfPath
+                           << "' entryPoint='" << entry_point << "'";
+        auto res = runtime->ExecutePandaFile(pfPath, std::string_view(entry_point), {});
+        result.success = res ? 1 : 0;
+        result.exit_code = res ? res.Value() : 1;
+        if (!res) {
+            state->lastError = "ExecutePandaFile failed for custom entry point";
+            result.error = state->lastError.c_str();
+        }
+        return result;
+    }
+
+    // Legacy path: use ExecuteModule with default entry point logic
     std::string_view name = (module_name != nullptr) ? std::string_view(module_name)
                                                      : std::string_view();
     auto [ok, exitCode] = ark::ets::ExecuteModule(name);

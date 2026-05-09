@@ -26,3 +26,4 @@ app/libs/*.aar
 
 third_party/build_android
 third_party/build_gen
+third_party/build/

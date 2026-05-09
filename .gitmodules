@@ -10,3 +10,6 @@
 [submodule "third_party/app_framework"]
 	path = third_party/app_framework
 	url = https://gitee.com/arkui-x/app_framework.git
+[submodule "third_party/arkcompiler_ets_runtime"]
+	path = third_party/arkcompiler_ets_runtime
+	url = https://gitee.com/openharmony/arkcompiler_ets_runtime.git
