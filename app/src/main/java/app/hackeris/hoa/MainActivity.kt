@@ -146,15 +146,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchHap(hap: InstalledHap) {
-        Log.e(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility}")
-        val intent = Intent(this, HoaAbilityActivity::class.java).apply {
+        val slot = ProcessSlotManager.allocateSlot(this)
+        if (slot < 0) {
+            AlertDialog.Builder(this)
+                .setTitle("No available slots")
+                .setMessage("All ${ProcessSlotManager.MAX_SLOTS} process slots are in use. Close a running HAP before launching another.")
+                .setPositiveButton("OK", null)
+                .show()
+            Log.w(TAG, "All ${ProcessSlotManager.MAX_SLOTS} process slots occupied")
+            return
+        }
+        Log.e(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility} slot=$slot")
+        val intent = Intent().apply {
+            setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
             putExtra("BUNDLE_NAME", hap.bundleName)
             putExtra("MODULE_NAME", hap.moduleName)
             putExtra("ABILITY_NAME", hap.mainAbility)
-            // ArkUI-X StageActivity expects to be the root of its task.
-            // Without CLEAR_TASK, the rendering surface may not initialize
-            // correctly when another Activity already exists in the task.
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            putExtra("PROCESS_SLOT", slot)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }
         startActivity(intent)
     }

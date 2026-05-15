@@ -4,17 +4,23 @@ import android.os.Bundle
 import android.util.Log
 import ohos.stage.ability.adapter.StageActivity
 
-class HoaAbilityActivity : StageActivity() {
+open class HoaAbilityActivity : StageActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val bundleName = intent.getStringExtra("BUNDLE_NAME") ?: "app.hackeris.harmonyexample"
         val moduleName = intent.getStringExtra("MODULE_NAME") ?: "entry"
         val abilityName = intent.getStringExtra("ABILITY_NAME") ?: "EntryAbility"
+        val slot = intent.getIntExtra("PROCESS_SLOT", -1)
+
+        if (slot >= 0) {
+            ProcessSlotManager.claimSlot(this, slot)
+            Log.e(TAG, "Process slot $slot claimed, PID=${android.os.Process.myPid()}")
+        }
 
         val instanceName = "$bundleName:$moduleName:$abilityName:"
         Log.e(TAG, "========== HoaAbilityActivity onCreate START ==========")
         Log.e(TAG, "bundleName=$bundleName, moduleName=$moduleName, abilityName=$abilityName")
-        Log.e(TAG, "instanceName=$instanceName")
+        Log.e(TAG, "instanceName=$instanceName, slot=$slot")
 
         // Check if StageApplication init succeeded
         val app = applicationContext as? HoaApplication
@@ -66,6 +72,11 @@ class HoaAbilityActivity : StageActivity() {
 
     override fun onDestroy() {
         Log.e(TAG, "onDestroy — UIAbility.onDestroy() should fire")
+        val slot = intent.getIntExtra("PROCESS_SLOT", -1)
+        if (slot >= 0) {
+            ProcessSlotManager.releaseSlot(this, slot)
+            Log.e(TAG, "Process slot $slot released")
+        }
         super.onDestroy()
     }
 

@@ -32,7 +32,36 @@
             android:label="HOA Dev Test" />
 
         <activity
-            android:name=".HoaAbilityActivity"
+            android:name=".HoaAbilityActivity0"
+            android:process=":hap0"
+            android:exported="true"
+            android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".HoaAbilityActivity1"
+            android:process=":hap1"
+            android:exported="true"
+            android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".HoaAbilityActivity2"
+            android:process=":hap2"
+            android:exported="true"
+            android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".HoaAbilityActivity3"
+            android:process=":hap3"
+            android:exported="true"
+            android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".HoaAbilityActivity4"
+            android:process=":hap4"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
             android:windowSoftInputMode="adjustResize|stateHidden" />

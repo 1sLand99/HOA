@@ -116,11 +116,20 @@ class DevTestActivity : AppCompatActivity() {
     }
 
     private fun launchHap() {
-        val intent = Intent(this, HoaAbilityActivity::class.java).apply {
+        val slot = ProcessSlotManager.allocateSlot(this)
+        if (slot < 0) {
+            Toast.makeText(this, "All ${ProcessSlotManager.MAX_SLOTS} process slots in use", Toast.LENGTH_LONG).show()
+            Log.w(TAG, "All process slots occupied")
+            return
+        }
+        Log.e(TAG, "Launching test HAP slot=$slot")
+        val intent = Intent().apply {
+            setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
             putExtra("BUNDLE_NAME", "app.hackeris.harmonyexample")
             putExtra("MODULE_NAME", "entry")
             putExtra("ABILITY_NAME", "EntryAbility")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            putExtra("PROCESS_SLOT", slot)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }
         startActivity(intent)
     }
