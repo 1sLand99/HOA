@@ -13,6 +13,7 @@ import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import app.hackeris.hoa.hap.HapBundleLoader
 import app.hackeris.hoa.hap.HapInstaller
 import app.hackeris.hoa.hap.InstalledHap
 
@@ -81,7 +82,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (uri != null) {
             Log.e(TAG, "Handling HAP from intent: action=${intent.action} uri=$uri")
-            installHapFromUri(uri)
+            previewAndInstallHap(uri)
         }
     }
 
@@ -127,34 +128,125 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQUEST_PICK_HAP && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
-            installHapFromUri(uri)
+            previewAndInstallHap(uri)
         }
     }
 
-    private fun installHapFromUri(uri: Uri) {
+    private fun previewAndInstallHap(uri: Uri) {
+        installButton.isEnabled = false
+        installButton.text = getString(R.string.btn_extracting)
+
+        Thread {
+            try {
+                // Copy the content URI to a temp file so we can read module.json
+                // without fully extracting the HAP.
+                val tmpFile = java.io.File(cacheDir, "hap_preview_${System.currentTimeMillis()}")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    tmpFile.outputStream().use { out -> input.copyTo(out) }
+                } ?: throw IllegalStateException("Cannot open selected file")
+
+                val config = HapBundleLoader().previewConfig(tmpFile.absolutePath)
+
+                runOnUiThread {
+                    installButton.isEnabled = true
+                    installButton.text = getString(R.string.btn_install_hap)
+                    showInstallPreviewDialog(tmpFile, config)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "HAP preview failed", e)
+                runOnUiThread {
+                    Toast.makeText(
+                        this, getString(R.string.toast_install_failed_fmt, e.message), Toast.LENGTH_LONG
+                    ).show()
+                    installButton.isEnabled = true
+                    installButton.text = getString(R.string.btn_install_hap)
+                }
+            }
+        }.start()
+    }
+
+    private fun showInstallPreviewDialog(
+        tmpFile: java.io.File, config: app.hackeris.hoa.hap.ModuleConfig
+    ) {
+        val sb = StringBuilder()
+
+        fun row(label: String, value: String) {
+            sb.append(label).append(": ").append(value).append("\n")
+        }
+
+        row(getString(R.string.label_bundle_name), config.bundleName.ifEmpty { "—" })
+        row(getString(R.string.label_module),
+            "${config.name} (${config.type})")
+        row(getString(R.string.label_version),
+            "${config.versionName} (${config.versionCode})")
+        row(getString(R.string.label_sdk),
+            "target=${config.targetApiVersion}  min=${config.minApiVersion}")
+
+        if (config.requestPermissions.isNotEmpty()) {
+            sb.append("\n").append(getString(R.string.label_permissions))
+                .append(" (").append(config.requestPermissions.size).append("):\n")
+            config.requestPermissions.forEach { sb.append("  • ").append(it).append("\n") }
+        }
+
+        if (config.abilities.isNotEmpty()) {
+            sb.append("\n").append(getString(R.string.label_abilities))
+                .append(" (").append(config.abilities.size).append("):\n")
+            config.abilities.forEach { a ->
+                sb.append("  • ").append(a.name).append(" (").append(a.type).append(")\n")
+            }
+        }
+
+        val contentView = android.widget.TextView(this).apply {
+            text = sb.toString().trimEnd()
+            textSize = 14f
+            @Suppress("DEPRECATION")
+            setTextColor(getColor(android.R.color.primary_text_light))
+            setPadding(40, 24, 40, 8)
+            setLineSpacing(4f, 1f)
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(contentView)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.dialog_install_preview_title))
+            .setView(scrollView)
+            .setPositiveButton(getString(R.string.btn_install)) { _, _ ->
+                doInstall(tmpFile)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                tmpFile.delete()
+            }
+            .setOnCancelListener { tmpFile.delete() }
+            .show()
+    }
+
+    private fun doInstall(tmpFile: java.io.File) {
         installButton.isEnabled = false
         installButton.text = getString(R.string.btn_installing)
 
         Thread {
             try {
-                val result = contentResolver.openInputStream(uri)?.use { input ->
-                    installer.install(input)
-                } ?: throw IllegalStateException("Cannot open selected file")
-
+                val result = installer.install(tmpFile.absolutePath)
                 runOnUiThread {
-                    Toast.makeText(this, getString(R.string.toast_installed_fmt, result.bundleName), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this, getString(R.string.toast_installed_fmt, result.bundleName), Toast.LENGTH_SHORT
+                    ).show()
                     refreshHapList()
+                    installButton.isEnabled = true
+                    installButton.text = getString(R.string.btn_install_hap)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "HAP install failed", e)
                 runOnUiThread {
-                    Toast.makeText(this, getString(R.string.toast_install_failed_fmt, e.message), Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                runOnUiThread {
+                    Toast.makeText(
+                        this, getString(R.string.toast_install_failed_fmt, e.message), Toast.LENGTH_LONG
+                    ).show()
                     installButton.isEnabled = true
                     installButton.text = getString(R.string.btn_install_hap)
                 }
+            } finally {
+                tmpFile.delete()
             }
         }.start()
     }

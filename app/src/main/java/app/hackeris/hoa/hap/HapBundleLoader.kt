@@ -5,6 +5,17 @@ import java.util.zip.ZipFile
 
 class HapBundleLoader {
 
+    // Lightweight parse — reads only module.json from the zip, skips
+    // bytecode, resources, and native libs.  Suitable for preview dialogs.
+    fun previewConfig(hapPath: String): ModuleConfig {
+        val zip = ZipFile(hapPath)
+        return try {
+            parseModuleConfig(zip)
+        } finally {
+            zip.close()
+        }
+    }
+
     fun parse(hapPath: String): HapBundle {
         val zip = try {
             ZipFile(hapPath)

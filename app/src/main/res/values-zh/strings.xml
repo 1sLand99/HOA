@@ -42,6 +42,16 @@
     <!-- HoaAbilityActivity -->
     <string name="toast_module_not_found">未找到模块: %1$s/%2$s</string>
 
+    <!-- Install preview dialog -->
+    <string name="dialog_install_preview_title">安装 HAP</string>
+    <string name="label_bundle_name">应用</string>
+    <string name="label_module">模块</string>
+    <string name="label_version">版本</string>
+    <string name="label_sdk">SDK</string>
+    <string name="label_permissions">权限</string>
+    <string name="label_abilities">Ability</string>
+    <string name="btn_install">安装</string>
+
     <!-- item_hap -->
     <string name="desc_hap_icon">HAP 图标</string>
 </resources>
