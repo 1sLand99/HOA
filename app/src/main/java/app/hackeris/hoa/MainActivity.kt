@@ -172,6 +172,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private inner class HapListAdapter : BaseAdapter() {
+        // Cache decoded HAP icons to avoid re-reading module.json and
+        // re-decoding bitmaps on every getView() call.  The cache is small
+        // (< 10 entries) and cleared when refreshHapList() replaces this adapter.
+        private val iconCache = mutableMapOf<String, android.graphics.Bitmap?>()
+
         override fun getCount() = installedHaps.size
         override fun getItem(position: Int) = installedHaps[position]
         override fun getItemId(position: Int) = position.toLong()
@@ -186,7 +191,63 @@ class MainActivity : AppCompatActivity() {
             view.findViewById<TextView>(R.id.hap_ability_info).text =
                 if (hap.mainAbility.isNotBlank()) "Ability: ${hap.mainAbility}" else "No ability"
 
+            val iconView = view.findViewById<android.widget.ImageView>(R.id.hap_icon)
+            val cacheKey = "${hap.bundleName}.${hap.moduleName}"
+            val cached = iconCache[cacheKey]
+            if (cached != null || iconCache.containsKey(cacheKey)) {
+                iconView.setImageBitmap(cached)
+            } else {
+                iconView.setImageResource(android.R.drawable.sym_def_app_icon)
+                Thread {
+                    val bitmap = loadHapIcon(hap)
+                    iconCache[cacheKey] = bitmap
+                    runOnUiThread {
+                        if (installedHaps.getOrNull(position) == hap) {
+                            iconView.setImageBitmap(bitmap)
+                        }
+                    }
+                }.start()
+            }
+
             return view
+        }
+
+        private fun loadHapIcon(hap: InstalledHap): android.graphics.Bitmap? {
+            val fullModuleName = "${hap.bundleName}.${hap.moduleName}"
+            val moduleJsonFile = java.io.File(filesDir, "hap/$fullModuleName/module.json")
+            if (!moduleJsonFile.exists()) return null
+
+            try {
+                val json = org.json.JSONObject(moduleJsonFile.readText())
+                val moduleObj = json.getJSONObject("module")
+                val abilities = moduleObj.optJSONArray("abilities")
+                if (abilities != null) {
+                    for (i in 0 until abilities.length()) {
+                        val ability = abilities.getJSONObject(i)
+                        if (ability.getString("name") == hap.mainAbility) {
+                            val iconRef = ability.optString("startWindowIcon", "")
+                                .ifEmpty { ability.optString("icon", "") }
+                            return loadBitmapFromRef(fullModuleName, iconRef)
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+            return null
+        }
+
+        private fun loadBitmapFromRef(fullModuleName: String, iconRef: String): android.graphics.Bitmap? {
+            if (!iconRef.startsWith("\$media:")) return null
+            val mediaName = iconRef.removePrefix("\$media:")
+            val mediaDir = java.io.File(filesDir, "hap/$fullModuleName/resources/base/media")
+            if (!mediaDir.isDirectory) return null
+
+            for (ext in listOf("png", "jpg", "jpeg", "webp")) {
+                val file = java.io.File(mediaDir, "$mediaName.$ext")
+                if (file.exists()) {
+                    return android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                }
+            }
+            return null
         }
     }
 

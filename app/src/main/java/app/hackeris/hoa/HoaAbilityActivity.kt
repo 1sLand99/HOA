@@ -1,8 +1,12 @@
 package app.hackeris.hoa
 
+import android.app.ActivityManager
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
 import ohos.stage.ability.adapter.StageActivity
+import org.json.JSONObject
+import java.io.File
 
 open class HoaAbilityActivity : StageActivity() {
 
@@ -60,6 +64,16 @@ open class HoaAbilityActivity : StageActivity() {
         Log.e(TAG, "========== HoaAbilityActivity onCreate END ==========")
     }
 
+    override fun onPostCreate(savedInstanceState: Bundle?) {
+        super.onPostCreate(savedInstanceState)
+        // Apply HAP metadata (title + icon) AFTER super.onCreate() so that
+        // any title/task-description set by StageActivity is overwritten.
+        val bundleName = intent.getStringExtra("BUNDLE_NAME") ?: "app.hackeris.harmonyexample"
+        val moduleName = intent.getStringExtra("MODULE_NAME") ?: "entry"
+        val abilityName = intent.getStringExtra("ABILITY_NAME") ?: "EntryAbility"
+        applyHapTaskDescription(bundleName, moduleName, abilityName)
+    }
+
     override fun onResume() {
         Log.e(TAG, "onResume — UIAbility.onForeground() should fire")
         super.onResume()
@@ -87,6 +101,94 @@ open class HoaAbilityActivity : StageActivity() {
     override fun onBackPressed() {
         Log.e(TAG, "onBackPressed")
         super.onBackPressed()
+    }
+
+    // ============================================================
+    // Apply the HAP's app name and icon to the Android Activity,
+    // so the task switcher / recents screen shows the HAP identity
+    // rather than the host app's "HOA" label and launcher icon.
+    // ============================================================
+    //
+    // Limitations (by design — kept simple intentionally):
+    //
+    //   1. Title: String resources referenced by module.json (e.g.
+    //      "$string:app_name") are stored in the binary resources.index.
+    //      Without a parser for that format, the actual display string
+    //      is not accessible.  We fall back to using the bundleName,
+    //      which is always available and human-recognisable for most
+    //      real-world HAPs (e.g. "top.wangchenyan.wanharmony" →
+    //      "wanharmony" or "top.wangchenyan.wanharmony").
+    //
+    //   2. Icon:  Resource references like "$media:icon" are resolved
+    //      by scanning resources/base/media/ for {name}.{ext}.  Only
+    //      the "base" density bucket is checked.  HAPs that place the
+    //      icon exclusively in density-specific directories (e.g.
+    //      resources/xxxhdpi/media/) will not be matched.  SVG icons
+    //      are skipped because Android cannot decode them natively.
+    //
+    //   3. The icon loaded here is used for the task-switcher thumbnail
+    //      only.  It does NOT change the launcher icon (the host APK
+    //      icon remains) and does NOT affect the splash / start-window
+    //      shown during cold start.
+    //
+    private fun applyHapTaskDescription(
+        bundleName: String, moduleName: String, abilityName: String
+    ) {
+        val fullModuleName = "$bundleName.$moduleName"
+        val moduleJsonFile = File(filesDir, "hap/$fullModuleName/module.json")
+        if (!moduleJsonFile.exists()) {
+            setTitle(bundleName)
+            return
+        }
+
+        var displayName = bundleName
+        var bitmap: android.graphics.Bitmap? = null
+
+        try {
+            val json = JSONObject(moduleJsonFile.readText())
+            val moduleObj = json.getJSONObject("module")
+            val abilities = moduleObj.optJSONArray("abilities")
+            if (abilities != null) {
+                for (i in 0 until abilities.length()) {
+                    val ability = abilities.getJSONObject(i)
+                    if (ability.getString("name") == abilityName) {
+                        // Prefer startWindowIcon (splash), fall back to icon.
+                        val iconRef = ability.optString("startWindowIcon", "")
+                            .ifEmpty { ability.optString("icon", "") }
+                        bitmap = iconRefToBitmap(fullModuleName, iconRef)
+                        break
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "applyHapTaskDescription failed", e)
+        }
+
+        setTitle(displayName)
+        @Suppress("DEPRECATION")
+        if (bitmap != null) {
+            setTaskDescription(ActivityManager.TaskDescription(displayName, bitmap))
+        } else {
+            setTaskDescription(ActivityManager.TaskDescription(displayName))
+        }
+        Log.e(TAG, "applyHapTaskDescription: title=$displayName icon=${bitmap != null}")
+    }
+
+    // Resolve a "$media:name" reference to a Bitmap by trying common
+    // raster extensions in the "base" density bucket.  SVG is skipped.
+    private fun iconRefToBitmap(fullModuleName: String, iconRef: String): android.graphics.Bitmap? {
+        if (!iconRef.startsWith("\$media:")) return null
+        val mediaName = iconRef.removePrefix("\$media:")
+        val mediaDir = File(filesDir, "hap/$fullModuleName/resources/base/media")
+        if (!mediaDir.isDirectory) return null
+
+        for (ext in listOf("png", "jpg", "jpeg", "webp")) {
+            val file = File(mediaDir, "$mediaName.$ext")
+            if (file.exists()) {
+                return BitmapFactory.decodeFile(file.absolutePath)
+            }
+        }
+        return null
     }
 
     private fun moduleExists(bundleName: String, moduleName: String): Boolean {
