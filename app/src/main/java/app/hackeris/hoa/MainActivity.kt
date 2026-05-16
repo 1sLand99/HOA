@@ -54,11 +54,35 @@ class MainActivity : AppCompatActivity() {
 
         updateRuntimeStatus()
         Log.e(TAG, "========== HOA MainActivity START ==========")
+
+        // Handle HAP file opened from file manager or shared from another app
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
     }
 
     override fun onResume() {
         super.onResume()
         refreshHapList()
+    }
+
+    private fun handleIntent(intent: Intent) {
+        val uri: Uri? = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> {
+                // Shared file comes via EXTRA_STREAM
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+            else -> return
+        }
+        if (uri != null) {
+            Log.e(TAG, "Handling HAP from intent: action=${intent.action} uri=$uri")
+            installHapFromUri(uri)
+        }
     }
 
     private fun updateRuntimeStatus() {
