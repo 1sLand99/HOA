@@ -15,9 +15,10 @@ data class InstalledHap(
 
 class HapInstaller(private val context: Context) {
 
-    // Install to filesDir/arkui-x/ so the ArkUI-X runtime's
+    // Install to filesDir/hap/ so the ArkUI-X runtime's
     // StageAssetProvider.GetAppDataModuleDir() can discover them.
-    private val baseDir = File(context.filesDir, "arkui-x")
+    private val baseDir = File(context.filesDir, "hap")
+    private val sysDir = File(context.filesDir, "sys")
 
     fun install(hapPath: String): InstalledHap {
         val bundle = HapBundleLoader().parse(hapPath)
@@ -43,6 +44,13 @@ class HapInstaller(private val context: Context) {
 
         if (targetDir.exists()) {
             targetDir.deleteRecursively()
+        }
+        // Also clean the Preload copy under files/sys/ so the runtime re-copies
+        // fresh resources on next launch. Otherwise stale resources.index from
+        // a previous installation with the same bundleName would be used.
+        val sysTargetDir = File(sysDir, fullModuleName)
+        if (sysTargetDir.exists()) {
+            sysTargetDir.deleteRecursively()
         }
         targetDir.mkdirs()
 
@@ -149,10 +157,16 @@ class HapInstaller(private val context: Context) {
     }
 
     fun uninstall(bundleName: String) {
-        // Remove all modules matching this bundleName
-        if (!baseDir.exists()) return
-        baseDir.listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith("$bundleName.") }
-            ?.forEach { it.deleteRecursively() }
+        // Remove all modules matching this bundleName from hap/ and sys/
+        if (baseDir.exists()) {
+            baseDir.listFiles()
+                ?.filter { it.isDirectory && it.name.startsWith("$bundleName.") }
+                ?.forEach { it.deleteRecursively() }
+        }
+        if (sysDir.exists()) {
+            sysDir.listFiles()
+                ?.filter { it.isDirectory && it.name.startsWith("$bundleName.") }
+                ?.forEach { it.deleteRecursively() }
+        }
     }
 }

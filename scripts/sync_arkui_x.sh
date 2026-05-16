@@ -26,11 +26,11 @@ ARKUI_BUILD="${ARKUI_BUILD:-}"
 # HOA 项目目标子目录
 JNILIBS_DIR="$PROJECT_ROOT/app/src/main/jniLibs/arm64-v8a"
 JAR_DIR="$PROJECT_ROOT/app/libs"
-SYSRES_ROOT="$PROJECT_ROOT/app/src/main/assets/arkui-x/systemres"
+SYSRES_ROOT="$PROJECT_ROOT/app/src/main/assets/sys/systemres"
 SYSRES_ABC_DIR="$SYSRES_ROOT/abc"
 SYSRES_RES_DIR="$SYSRES_ROOT/resources"
 SYSRES_FONTS_DIR="$SYSRES_ROOT/fonts"
-STUB_DIR="$PROJECT_ROOT/app/src/main/assets/arkui-x/stub/arm64-v8a"
+STUB_DIR="$PROJECT_ROOT/app/src/main/assets/sys/stub/arm64-v8a"
 
 # ============================================================
 # 选项解析

@@ -18,7 +18,7 @@ object HapExtractor {
     ): Boolean {
         val filesDir = context.filesDir
         val fullName = "$bundleName.$moduleName"
-        val targetDir = File(filesDir, "arkui-x/$fullName")
+        val targetDir = File(filesDir, "hap/$fullName")
 
         try {
             val hapInputStream = context.assets.open(hapAssetPath)

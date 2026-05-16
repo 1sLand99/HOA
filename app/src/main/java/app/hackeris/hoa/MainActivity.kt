@@ -73,18 +73,8 @@ class MainActivity : AppCompatActivity() {
             java.io.File(nativeLibDir, lib).exists()
         }
 
-        val assetItems = listOf(
-            "arkui-x/entry/ets/modules.abc",
-            "arkui-x/entry/module.json",
-            "arkui-x/entry/resources.index"
-        )
-        val allAssetsPresent = assetItems.all { item ->
-            try { assets.open(item).close(); true } catch (_: Exception) { false }
-        }
-
         val runtime = if (allLibsPresent) "OK" else "INCOMPLETE"
-        val bytecode = if (allAssetsPresent) "OK" else "INCOMPLETE"
-        runtimeStatus.text = "Runtime: $runtime  |  Bytecode: $bytecode  |  ABI: ${android.os.Build.SUPPORTED_ABIS.firstOrNull()}"
+        runtimeStatus.text = "Runtime: $runtime  |  ABI: ${android.os.Build.SUPPORTED_ABIS.firstOrNull()}"
     }
 
     private fun refreshHapList() {

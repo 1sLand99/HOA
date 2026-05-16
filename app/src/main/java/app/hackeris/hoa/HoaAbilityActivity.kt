@@ -34,7 +34,7 @@ open class HoaAbilityActivity : StageActivity() {
         // with StackOverflow in WindowViewSurface.onHoverEvent.
         if (!moduleExists(bundleName, moduleName)) {
             Log.e(TAG, "Module not found: bundleName=$bundleName, moduleName=$moduleName")
-            Log.e(TAG, "  Checked: assets/arkui-x/$moduleName/ and filesDir/arkui-x/$bundleName.$moduleName/")
+            Log.e(TAG, "  Checked: filesDir/hap/$bundleName.$moduleName/")
             android.widget.Toast.makeText(this, "Module not found: $bundleName/$moduleName", android.widget.Toast.LENGTH_LONG).show()
             finish()
             return
@@ -78,6 +78,10 @@ open class HoaAbilityActivity : StageActivity() {
             Log.e(TAG, "Process slot $slot released")
         }
         super.onDestroy()
+        // Kill the process so the next launch gets a fresh ArkUI-X runtime.
+        // The ResourceManager in StageApplication is process-global and
+        // AddResource() fails if called again with the same path.
+        android.os.Process.killProcess(android.os.Process.myPid())
     }
 
     override fun onBackPressed() {
@@ -86,17 +90,9 @@ open class HoaAbilityActivity : StageActivity() {
     }
 
     private fun moduleExists(bundleName: String, moduleName: String): Boolean {
-        // Check APK assets: assets/arkui-x/$moduleName/
-        val assetDir = "arkui-x/$moduleName"
-        try {
-            assets.list(assetDir)?.let { files ->
-                if (files.isNotEmpty()) return true
-            }
-        } catch (_: Exception) { }
-
-        // Check app data dir: filesDir/arkui-x/$bundleName.$moduleName/
+        // Check app data dir: filesDir/hap/$bundleName.$moduleName/
         val fullName = "$bundleName.$moduleName"
-        val dynamicDir = java.io.File(filesDir, "arkui-x/$fullName")
+        val dynamicDir = java.io.File(filesDir, "hap/$fullName")
         if (dynamicDir.isDirectory && dynamicDir.listFiles()?.isNotEmpty() == true) return true
 
         return false

@@ -111,7 +111,7 @@ class DevTestActivity : AppCompatActivity() {
     }
 
     private fun isHapExtracted(): Boolean {
-        val dir = File(filesDir, "arkui-x/app.hackeris.harmonyexample.entry")
+        val dir = File(filesDir, "hap/app.hackeris.harmonyexample.entry")
         return dir.isDirectory && File(dir, "module.json").exists()
     }
 
@@ -137,7 +137,7 @@ class DevTestActivity : AppCompatActivity() {
     private fun refreshStatus() {
         val ready = isHapExtracted()
         if (ready) {
-            val modulesAbc = File(filesDir, "arkui-x/app.hackeris.harmonyexample.entry/ets/modules.abc")
+            val modulesAbc = File(filesDir, "hap/app.hackeris.harmonyexample.entry/ets/modules.abc")
             val abcSize = if (modulesAbc.exists()) modulesAbc.length() else 0
             statusText.text = "Test HAP: READY\nmodules.abc: $abcSize bytes"
             launchButton.isEnabled = true
