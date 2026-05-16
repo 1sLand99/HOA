@@ -20,6 +20,8 @@ local.properties
 .kotlin
 
 app/src/main/jniLibs/
+app/src/main/assets/sys/
+app/src/main/assets/hap/
 app/libs/*.jar
 app/libs/*.aar
 *.so
