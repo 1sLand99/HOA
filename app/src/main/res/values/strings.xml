@@ -51,6 +51,13 @@
     <string name="label_abilities">Abilities</string>
     <string name="btn_install">Install</string>
 
+    <!-- App info dialog -->
+    <string name="dialog_app_info_title">App Info</string>
+    <string name="btn_app_info">App Info</string>
+    <string name="label_vendor">Vendor</string>
+    <string name="label_size">Size</string>
+    <string name="label_pages">Pages</string>
+
     <!-- item_hap -->
     <string name="desc_hap_icon">HAP icon</string>
 </resources>

@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         }
         hapList.setOnItemLongClickListener { _, _, position, _ ->
             val hap = installedHaps[position]
-            confirmUninstall(hap)
+            showLongPressMenu(hap)
             true
         }
 
@@ -272,6 +272,94 @@ class MainActivity : AppCompatActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }
         startActivity(intent)
+    }
+
+    private fun showLongPressMenu(hap: InstalledHap) {
+        val items = arrayOf(
+            getString(R.string.btn_app_info),
+            getString(R.string.btn_uninstall)
+        )
+        AlertDialog.Builder(this)
+            .setTitle("${hap.bundleName}/${hap.moduleName}")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showHapInfoDialog(hap)
+                    1 -> confirmUninstall(hap)
+                }
+            }
+            .show()
+    }
+
+    private fun showHapInfoDialog(hap: InstalledHap) {
+        val config = hap.moduleConfig
+        val sb = StringBuilder()
+
+        fun row(label: String, value: String) {
+            sb.append(label).append(": ").append(value).append("\n")
+        }
+
+        row(getString(R.string.label_bundle_name), config.bundleName.ifEmpty { "—" })
+        row(getString(R.string.label_module), "${config.name} (${config.type})")
+        if (config.vendor.isNotBlank()) row(getString(R.string.label_vendor), config.vendor)
+        row(getString(R.string.label_version), "${config.versionName} (${config.versionCode})")
+        row(getString(R.string.label_sdk), "target=${config.targetApiVersion}  min=${config.minApiVersion}")
+        row(getString(R.string.label_size), formatSize(hap.contentDir))
+
+        if (config.requestPermissions.isNotEmpty()) {
+            sb.append("\n").append(getString(R.string.label_permissions))
+                .append(" (").append(config.requestPermissions.size).append("):\n")
+            config.requestPermissions.forEach { sb.append("  • ").append(it).append("\n") }
+        }
+
+        if (config.abilities.isNotEmpty()) {
+            sb.append("\n").append(getString(R.string.label_abilities))
+                .append(" (").append(config.abilities.size).append("):\n")
+            config.abilities.forEach { a ->
+                sb.append("  • ").append(a.name).append(" (").append(a.type).append(")\n")
+            }
+        }
+
+        if (config.pages.isNotEmpty()) {
+            sb.append("\n").append(getString(R.string.label_pages))
+                .append(" (").append(config.pages.size).append("):\n")
+            config.pages.forEach { sb.append("  • ").append(it).append("\n") }
+        }
+
+        val contentView = TextView(this).apply {
+            text = sb.toString().trimEnd()
+            textSize = 14f
+            @Suppress("DEPRECATION")
+            setTextColor(getColor(android.R.color.primary_text_light))
+            setPadding(40, 24, 40, 8)
+            setLineSpacing(4f, 1f)
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(contentView)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.dialog_app_info_title))
+            .setView(scrollView)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun formatSize(dir: java.io.File): String {
+        val bytes = dirSize(dir)
+        return when {
+            bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+            bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
+            else -> "$bytes B"
+        }
+    }
+
+    private fun dirSize(dir: java.io.File): Long {
+        if (!dir.isDirectory) return dir.length()
+        var size = 0L
+        dir.listFiles()?.forEach { f ->
+            size += if (f.isDirectory) dirSize(f) else f.length()
+        }
+        return size
     }
 
     private fun confirmUninstall(hap: InstalledHap) {
