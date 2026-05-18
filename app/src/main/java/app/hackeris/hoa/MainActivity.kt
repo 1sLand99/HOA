@@ -46,9 +46,9 @@ class MainActivity : AppCompatActivity() {
             val hap = installedHaps[position]
             launchHap(hap)
         }
-        hapList.setOnItemLongClickListener { _, _, position, _ ->
+        hapList.setOnItemLongClickListener { _, view, position, _ ->
             val hap = installedHaps[position]
-            showLongPressMenu(hap)
+            showLongPressMenu(view, hap)
             true
         }
 
@@ -277,23 +277,20 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-    private fun showLongPressMenu(hap: InstalledHap) {
-        val label = HapBundleLoader.resolveLabel(hap.contentDir, hap.moduleConfig)
-        val items = arrayOf(
-            getString(R.string.btn_app_info),
-            getString(R.string.btn_add_to_home),
-            getString(R.string.btn_uninstall)
-        )
-        AlertDialog.Builder(this)
-            .setTitle("$label/${hap.moduleName}")
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> showHapInfoDialog(hap)
-                    1 -> pinShortcut(hap)
-                    2 -> confirmUninstall(hap)
-                }
+    private fun showLongPressMenu(anchor: View, hap: InstalledHap) {
+        val popup = android.widget.PopupMenu(this, anchor)
+        popup.menu.add(0, MENU_APP_INFO, 0, getString(R.string.btn_app_info))
+        popup.menu.add(0, MENU_ADD_TO_HOME, 1, getString(R.string.btn_add_to_home))
+        popup.menu.add(0, MENU_UNINSTALL, 2, getString(R.string.btn_uninstall))
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                MENU_APP_INFO -> showHapInfoDialog(hap)
+                MENU_ADD_TO_HOME -> pinShortcut(hap)
+                MENU_UNINSTALL -> confirmUninstall(hap)
             }
-            .show()
+            true
+        }
+        popup.show()
     }
 
     private fun showHapInfoDialog(hap: InstalledHap) {
@@ -559,5 +556,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "HOA.Main"
         private const val REQUEST_PICK_HAP = 1001
+        private const val MENU_APP_INFO = 1
+        private const val MENU_ADD_TO_HOME = 2
+        private const val MENU_UNINSTALL = 3
     }
 }
