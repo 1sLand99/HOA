@@ -16,9 +16,20 @@ class DevTestActivity : AppCompatActivity() {
     private lateinit var extractButton: Button
     private lateinit var launchButton: Button
 
-    private val autoLaunch by lazy {
-        intent.getBooleanExtra("autoLaunch", false)
-    }
+    // If provided via intent extras, these override the hardcoded test HAP.
+    private val targetBundle by lazy { intent.getStringExtra("targetBundle") }
+    private val targetModule by lazy { intent.getStringExtra("targetModule") }
+    private val targetAbility by lazy { intent.getStringExtra("targetAbility") }
+    private val autoLaunch by lazy { intent.getBooleanExtra("autoLaunch", false) }
+
+    // --- Default (hardcoded) test HAP ---
+    private val defaultBundle = "app.hackeris.harmonyexample"
+    private val defaultModule = "entry"
+    private val defaultAbility = "EntryAbility"
+
+    private val bundleName get() = targetBundle ?: defaultBundle
+    private val moduleName get() = targetModule ?: defaultModule
+    private val abilityName get() = targetAbility ?: defaultAbility
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,8 +42,16 @@ class DevTestActivity : AppCompatActivity() {
         if (autoLaunch) {
             extractButton.isEnabled = false
             extractButton.text = getString(R.string.btn_auto_mode)
-            Log.e(TAG, "Auto-launch mode, extracting and launching...")
-            extractAndLaunch()
+            Log.e(TAG, "Auto-launch mode bundle=$bundleName module=$moduleName ability=$abilityName")
+
+            if (targetBundle != null) {
+                // External target — HAP is already installed via MainActivity.
+                // No extraction needed.
+                launchHap()
+            } else {
+                // Default test HAP from assets — extract first.
+                extractAndLaunch()
+            }
         } else {
             extractButton.setOnClickListener {
                 extractButton.isEnabled = false
@@ -45,7 +64,7 @@ class DevTestActivity : AppCompatActivity() {
         }
 
         refreshStatus()
-        Log.e(TAG, "DevTestActivity created, autoLaunch=$autoLaunch")
+        Log.e(TAG, "DevTestActivity created, autoLaunch=$autoLaunch params=${targetBundle != null}")
     }
 
     override fun onResume() {
@@ -105,29 +124,38 @@ class DevTestActivity : AppCompatActivity() {
         return HapExtractor.extractHapToFilesDir(
             this,
             "hap/entry.hap",
-            "app.hackeris.harmonyexample",
-            "entry"
+            bundleName,
+            moduleName
         )
     }
 
     private fun isHapExtracted(): Boolean {
-        val dir = File(filesDir, "hap/app.hackeris.harmonyexample.entry")
+        val dir = File(filesDir, "hap/$bundleName.$moduleName")
         return dir.isDirectory && File(dir, "module.json").exists()
     }
 
     private fun launchHap() {
+        // Validate target module exists on disk.
+        val fullName = "$bundleName.$moduleName"
+        val moduleDir = File(filesDir, "hap/$fullName")
+        if (!moduleDir.isDirectory || moduleDir.listFiles()?.isEmpty() == true) {
+            Toast.makeText(this, getString(R.string.toast_module_not_found, bundleName, moduleName), Toast.LENGTH_LONG).show()
+            Log.e(TAG, "Target module not found: $fullName")
+            return
+        }
+
         val slot = ProcessSlotManager.allocateSlot(this)
         if (slot < 0) {
             Toast.makeText(this, getString(R.string.toast_slots_full_fmt, ProcessSlotManager.MAX_SLOTS), Toast.LENGTH_LONG).show()
             Log.w(TAG, "All process slots occupied")
             return
         }
-        Log.e(TAG, "Launching test HAP slot=$slot")
+        Log.e(TAG, "Launching HAP slot=$slot bundle=$bundleName/$moduleName/$abilityName")
         val intent = Intent().apply {
             setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
-            putExtra("BUNDLE_NAME", "app.hackeris.harmonyexample")
-            putExtra("MODULE_NAME", "entry")
-            putExtra("ABILITY_NAME", "EntryAbility")
+            putExtra("BUNDLE_NAME", bundleName)
+            putExtra("MODULE_NAME", moduleName)
+            putExtra("ABILITY_NAME", abilityName)
             putExtra("PROCESS_SLOT", slot)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }
@@ -137,13 +165,17 @@ class DevTestActivity : AppCompatActivity() {
     private fun refreshStatus() {
         val ready = isHapExtracted()
         if (ready) {
-            val modulesAbc = File(filesDir, "hap/app.hackeris.harmonyexample.entry/ets/modules.abc")
+            val modulesAbc = File(filesDir, "hap/$bundleName.$moduleName/ets/modules.abc")
             val abcSize = if (modulesAbc.exists()) modulesAbc.length() else 0
             statusText.text = getString(R.string.devtest_status_ready_fmt, abcSize)
             launchButton.isEnabled = true
+            launchButton.text = getString(R.string.btn_launch_test_hap)
         } else {
             statusText.text = getString(R.string.devtest_status_not_extracted)
-            launchButton.isEnabled = false
+            launchButton.isEnabled = targetBundle != null  // allow direct launch of installed HAPs
+            if (targetBundle != null) {
+                launchButton.text = "Launch $bundleName"
+            }
         }
     }
 
