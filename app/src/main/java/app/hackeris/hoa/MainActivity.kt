@@ -210,19 +210,28 @@ class MainActivity : AppCompatActivity() {
 
         Thread {
             try {
-                // Copy the content URI to a temp file so we can read module.json
-                // without fully extracting the HAP.
                 val tmpFile = java.io.File(cacheDir, "hap_preview_${System.currentTimeMillis()}")
                 contentResolver.openInputStream(uri)?.use { input ->
                     tmpFile.outputStream().use { out -> input.copyTo(out) }
                 } ?: throw IllegalStateException("Cannot open selected file")
 
-                val config = HapBundleLoader().previewConfig(tmpFile.absolutePath)
+                var hapPath: String
+                var config: app.hackeris.hoa.hap.ModuleConfig
+                try {
+                    config = HapBundleLoader().previewConfig(tmpFile.absolutePath)
+                    hapPath = tmpFile.absolutePath
+                } catch (e: app.hackeris.hoa.hap.HapParseException) {
+                    if (!HapBundleLoader().isAppPackage(tmpFile.absolutePath)) throw e
+                    hapPath = HapBundleLoader().unwrapSingleHap(tmpFile.absolutePath)
+                    tmpFile.delete()
+                    config = HapBundleLoader().previewConfig(hapPath)
+                }
 
+                val finalHapPath = hapPath
                 runOnUiThread {
                     installButton.isEnabled = true
                     installButton.text = getString(R.string.btn_install_hap)
-                    showInstallPreviewDialog(tmpFile, config)
+                    showInstallPreviewDialog(java.io.File(finalHapPath), config)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "HAP preview failed", e)

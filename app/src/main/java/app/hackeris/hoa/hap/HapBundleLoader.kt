@@ -16,6 +16,39 @@ class HapBundleLoader {
         }
     }
 
+    // Returns true if the file is a HarmonyOS .app package (a zip with pack.info).
+    fun isAppPackage(filePath: String): Boolean {
+        return try {
+            ZipFile(filePath).use { zip -> zip.getEntry("pack.info") != null }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    // Extracts the single .hap from a .app package.  Throws if the .app
+    // contains zero or more than one .hap entries.
+    fun unwrapSingleHap(appPath: String): String {
+        val hapTmp = java.io.File.createTempFile("hoa_app_hap_", ".hap")
+        ZipFile(appPath).use { zip ->
+            val hapEntries = zip.entries().asSequence()
+                .filter { !it.isDirectory && it.name.endsWith(".hap") }
+                .toList()
+
+            when (hapEntries.size) {
+                0 -> throw HapParseException("No HAP found in .app package")
+                1 -> {
+                    zip.getInputStream(hapEntries[0]).use { input ->
+                        hapTmp.outputStream().use { out -> input.copyTo(out) }
+                    }
+                    return hapTmp.absolutePath
+                }
+                else -> throw HapParseException(
+                    ".app contains ${hapEntries.size} HAPs — multi-HAP packages not supported yet"
+                )
+            }
+        }
+    }
+
     fun parse(hapPath: String): HapBundle {
         val zip = try {
             ZipFile(hapPath)
