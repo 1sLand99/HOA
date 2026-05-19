@@ -3,13 +3,9 @@
     <string name="devtest_label">HOA Dev Test</string>
 
     <!-- MainActivity -->
-    <string name="section_installed_haps">Installed HAPs</string>
     <string name="hint_no_haps">No HAPs installed yet.\nTap below to install one.</string>
     <string name="btn_install_hap">Install HAP</string>
     <string name="btn_installing">Installing…</string>
-    <string name="runtime_ok">OK</string>
-    <string name="runtime_incomplete">INCOMPLETE</string>
-    <string name="runtime_status_fmt">Runtime: %1$s  |  ABI: %2$s</string>
     <string name="toast_installed_fmt">Installed: %1$s</string>
     <string name="toast_install_failed_fmt">Install failed: %1$s</string>
     <string name="toast_uninstalled_fmt">Uninstalled: %1$s</string>
@@ -69,6 +65,7 @@
     <!-- Search & sort -->
     <string name="hint_search_haps">Search HAPs…</string>
     <string name="hint_no_search_results">No matching HAPs.</string>
+    <string name="menu_sort">Sort</string>
     <string name="btn_sort_name">A-Z</string>
     <string name="btn_sort_time_desc">Newest</string>
     <string name="btn_sort_time_asc">Oldest</string>

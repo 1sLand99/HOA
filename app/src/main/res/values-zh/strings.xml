@@ -4,13 +4,9 @@
     <string name="devtest_label">HOA 开发测试</string>
 
     <!-- MainActivity -->
-    <string name="section_installed_haps">已安装的 HAP</string>
     <string name="hint_no_haps">尚未安装 HAP。\n点击下方按钮安装一个。</string>
     <string name="btn_install_hap">安装 HAP</string>
     <string name="btn_installing">安装中…</string>
-    <string name="runtime_ok">正常</string>
-    <string name="runtime_incomplete">不完整</string>
-    <string name="runtime_status_fmt">运行时: %1$s  |  ABI: %2$s</string>
     <string name="toast_installed_fmt">已安装: %1$s</string>
     <string name="toast_install_failed_fmt">安装失败: %1$s</string>
     <string name="toast_uninstalled_fmt">已卸载: %1$s</string>
@@ -70,6 +66,7 @@
     <!-- Search & sort -->
     <string name="hint_search_haps">搜索 HAP…</string>
     <string name="hint_no_search_results">没有匹配的 HAP。</string>
+    <string name="menu_sort">排序</string>
     <string name="btn_sort_name">名称</string>
     <string name="btn_sort_time_desc">最近</string>
     <string name="btn_sort_time_asc">最早</string>

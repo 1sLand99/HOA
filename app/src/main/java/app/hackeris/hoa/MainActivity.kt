@@ -32,14 +32,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hapList: ListView
     private lateinit var emptyHint: TextView
     private lateinit var installButton: Button
-    private lateinit var runtimeStatus: TextView
     private var searchView: SearchView? = null
-    private var sortMenuItem: android.view.MenuItem? = null
+    private var sortMenu: Menu? = null
 
     private val hapAdapter = HapListAdapter()
     private var allHaps = listOf<InstalledHap>()
     private var installedHaps = listOf<InstalledHap>()
-    private var sortMode = SortMode.NAME
+    private var sortMode = SortMode.TIME_ASC
     private var searchQuery = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,7 +46,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         installer = HapInstaller(this)
-        runtimeStatus = findViewById(R.id.runtime_status)
         hapList = findViewById(R.id.hap_list)
         emptyHint = findViewById(R.id.empty_hint)
         installButton = findViewById(R.id.install_button)
@@ -67,7 +65,6 @@ class MainActivity : AppCompatActivity() {
             openHapPicker()
         }
 
-        updateRuntimeStatus()
         Log.e(TAG, "========== HOA MainActivity START ==========")
 
         // Handle HAP file opened from file manager or shared from another app
@@ -100,22 +97,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateRuntimeStatus() {
-        val nativeLibs = listOf(
-            "libarkui_android.so",
-            "libhilog.so",
-            "libarkui_componentsnapshot.so",
-            "libarkui_focuscontroller.so"
-        )
-        val nativeLibDir = applicationInfo.nativeLibraryDir
-        val allLibsPresent = nativeLibs.all { lib ->
-            java.io.File(nativeLibDir, lib).exists()
-        }
-
-        val runtime = if (allLibsPresent) getString(R.string.runtime_ok) else getString(R.string.runtime_incomplete)
-        runtimeStatus.text = getString(R.string.runtime_status_fmt, runtime, android.os.Build.SUPPORTED_ABIS.firstOrNull())
-    }
-
     private fun refreshHapList() {
         allHaps = installer.getInstalledHaps()
         filterAndSort()
@@ -143,21 +124,31 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        sortMenuItem = menu.findItem(R.id.action_sort).apply {
-            title = sortLabel()
-            setOnMenuItemClickListener {
-                sortMode = when (sortMode) {
-                    SortMode.NAME -> SortMode.TIME_DESC
-                    SortMode.TIME_DESC -> SortMode.TIME_ASC
-                    SortMode.TIME_ASC -> SortMode.NAME
-                }
-                title = sortLabel()
-                filterAndSort()
-                true
-            }
-        }
+        sortMenu = menu.findItem(R.id.action_sort_menu).subMenu
+        sortMenu?.findItem(sortModeToItemId())?.isChecked = true
 
         return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        val newMode = when (item.itemId) {
+            R.id.action_sort_name -> SortMode.NAME
+            R.id.action_sort_time_desc -> SortMode.TIME_DESC
+            R.id.action_sort_time_asc -> SortMode.TIME_ASC
+            else -> return super.onOptionsItemSelected(item)
+        }
+        if (newMode != sortMode) {
+            sortMode = newMode
+            item.isChecked = true
+            filterAndSort()
+        }
+        return true
+    }
+
+    private fun sortModeToItemId(): Int = when (sortMode) {
+        SortMode.NAME -> R.id.action_sort_name
+        SortMode.TIME_DESC -> R.id.action_sort_time_desc
+        SortMode.TIME_ASC -> R.id.action_sort_time_asc
     }
 
     private fun filterAndSort() {
@@ -194,12 +185,6 @@ class MainActivity : AppCompatActivity() {
             hapList.visibility = View.VISIBLE
             emptyHint.visibility = View.GONE
         }
-    }
-
-    private fun sortLabel(): String = when (sortMode) {
-        SortMode.NAME -> getString(R.string.btn_sort_name)
-        SortMode.TIME_DESC -> getString(R.string.btn_sort_time_desc)
-        SortMode.TIME_ASC -> getString(R.string.btn_sort_time_asc)
     }
 
     private fun openHapPicker() {

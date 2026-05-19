@@ -10,8 +10,24 @@
         app:showAsAction="always|collapseActionView" />
 
     <item
-        android:id="@+id/action_sort"
-        android:title="@string/btn_sort_name"
-        app:showAsAction="always" />
+        android:id="@+id/action_sort_menu"
+        android:title="@string/menu_sort"
+        android:icon="@android:drawable/ic_menu_sort_by_size"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/action_sort_time_asc"
+                    android:title="@string/btn_sort_time_asc"
+                    android:checked="true" />
+                <item
+                    android:id="@+id/action_sort_time_desc"
+                    android:title="@string/btn_sort_time_desc" />
+                <item
+                    android:id="@+id/action_sort_name"
+                    android:title="@string/btn_sort_name" />
+            </group>
+        </menu>
+    </item>
 
 </menu>
