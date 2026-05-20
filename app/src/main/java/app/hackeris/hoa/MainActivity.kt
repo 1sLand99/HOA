@@ -332,6 +332,15 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    private fun openDetailPage(hap: InstalledHap) {
+        val intent = Intent(this, HapDetailActivity::class.java).apply {
+            putExtra("BUNDLE_NAME", hap.bundleName)
+            putExtra("MODULE_NAME", hap.moduleName)
+            putExtra("ABILITY_NAME", hap.mainAbility)
+        }
+        startActivity(intent)
+    }
+
     private fun launchHap(hap: InstalledHap) {
         val slot = ProcessSlotManager.allocateSlot(this)
         if (slot < 0) {
@@ -362,89 +371,13 @@ class MainActivity : AppCompatActivity() {
         popup.menu.add(0, MENU_UNINSTALL, 2, getString(R.string.btn_uninstall))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                MENU_APP_INFO -> showHapInfoDialog(hap)
+                MENU_APP_INFO -> openDetailPage(hap)
                 MENU_ADD_TO_HOME -> pinShortcut(hap)
                 MENU_UNINSTALL -> confirmUninstall(hap)
             }
             true
         }
         popup.show()
-    }
-
-    private fun showHapInfoDialog(hap: InstalledHap) {
-        val config = hap.moduleConfig
-        val label = HapBundleLoader.resolveLabel(hap.contentDir, config)
-        val sb = StringBuilder()
-
-        fun row(label: String, value: String) {
-            sb.append(label).append(": ").append(value).append("\n")
-        }
-
-        row(getString(R.string.label_bundle_name), label)
-        if (label != config.bundleName) {
-            row("  Package", config.bundleName.ifEmpty { "—" })
-        }
-        row(getString(R.string.label_module), "${config.name} (${config.type})")
-        if (config.vendor.isNotBlank()) row(getString(R.string.label_vendor), config.vendor)
-        row(getString(R.string.label_version), "${config.versionName} (${config.versionCode})")
-        row(getString(R.string.label_sdk), "target=${config.targetApiVersion}  min=${config.minApiVersion}")
-        row(getString(R.string.label_size), formatSize(hap.contentDir))
-
-        if (config.requestPermissions.isNotEmpty()) {
-            sb.append("\n").append(getString(R.string.label_permissions))
-                .append(" (").append(config.requestPermissions.size).append("):\n")
-            config.requestPermissions.forEach { sb.append("  • ").append(it).append("\n") }
-        }
-
-        if (config.abilities.isNotEmpty()) {
-            sb.append("\n").append(getString(R.string.label_abilities))
-                .append(" (").append(config.abilities.size).append("):\n")
-            config.abilities.forEach { a ->
-                sb.append("  • ").append(a.name).append(" (").append(a.type).append(")\n")
-            }
-        }
-
-        if (config.pages.isNotEmpty()) {
-            sb.append("\n").append(getString(R.string.label_pages))
-                .append(" (").append(config.pages.size).append("):\n")
-            config.pages.forEach { sb.append("  • ").append(it).append("\n") }
-        }
-
-        val contentView = TextView(this).apply {
-            text = sb.toString().trimEnd()
-            textSize = 14f
-            @Suppress("DEPRECATION")
-            setTextColor(getColor(android.R.color.primary_text_light))
-            setPadding(40, 24, 40, 8)
-            setLineSpacing(4f, 1f)
-        }
-        val scrollView = android.widget.ScrollView(this).apply {
-            addView(contentView)
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.dialog_app_info_title))
-            .setView(scrollView)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
-    }
-
-    private fun formatSize(dir: java.io.File): String {
-        val bytes = dirSize(dir)
-        return when {
-            bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
-            bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
-            else -> "$bytes B"
-        }
-    }
-
-    private fun dirSize(dir: java.io.File): Long {
-        if (!dir.isDirectory) return dir.length()
-        var size = 0L
-        dir.listFiles()?.forEach { f ->
-            size += if (f.isDirectory) dirSize(f) else f.length()
-        }
-        return size
     }
 
     private fun confirmUninstall(hap: InstalledHap) {

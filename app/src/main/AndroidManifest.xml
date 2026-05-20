@@ -65,6 +65,12 @@
             android:label="@string/devtest_label" />
 
         <activity
+            android:name=".HapDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:label="@string/dialog_app_info_title" />
+
+        <activity
             android:name=".HoaShortcutActivity"
             android:exported="true"
             android:taskAffinity=""
