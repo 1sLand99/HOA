@@ -34,7 +34,7 @@ fi
 
 TARGET_DIR="$1"
 MANIFEST_URL="https://gitcode.com/arkui-x/manifest.git"
-MANIFEST_BRANCH="master"
+MANIFEST_BRANCH="ArkUI-X-6.1-Release"
 
 # ============================================================
 # 前置条件检查
@@ -80,28 +80,29 @@ cat > .repo/local_manifests/hoa.xml << 'MANIFEST'
     <!--
     HOA 项目修改版仓库清单。
     以下 6 个仓库使用 harmony-on-android 组织的 fork，
-    hoa 分支包含 OHOS HAP 在 Android 上运行所需的全部修改。
+    hoa-6.1 分支包含基于 ArkUI-X 6.1-Release 的 OHOS HAP 在
+    Android 上运行所需的全部修改。
     -->
 
     <remote fetch="https://gitcode.com/harmony-on-android" name="hoa" />
 
     <!-- ArkCompiler ETS 运行时: OHOS HAP record 名适配 (isOhosHapMode 标志位, GetOutEntryPoint 等) -->
-    <project path="arkcompiler/ets_runtime" name="arkcompiler_ets_runtime" remote="hoa" revision="hoa" />
+    <project path="arkcompiler/ets_runtime" name="arkcompiler_ets_runtime" remote="hoa" revision="hoa-6.1" />
 
     <!-- 构建系统: GN 模板适配 Android NDK (external_deps 清空, arm64e 跳过, PAC 移除) -->
-    <project path="build" name="build" remote="hoa" revision="hoa" />
+    <project path="build" name="build" remote="hoa" revision="hoa-6.1" />
 
     <!-- 应用框架: OHOS_HAP_MODE 环境变量读取, hapPath 前缀适配 -->
-    <project path="foundation/appframework" name="app_framework" remote="hoa" revision="hoa" />
+    <project path="foundation/appframework" name="app_framework" remote="hoa" revision="hoa-6.1" />
 
     <!-- Android 适配器: JNI setenv 桥接, StageApplication Java API, resources.index 路径修复, sys 目录重命名 -->
-    <project path="foundation/arkui/ace_engine/adapter/android" name="arkui_for_android" remote="hoa" revision="hoa" />
+    <project path="foundation/arkui/ace_engine/adapter/android" name="arkui_for_android" remote="hoa" revision="hoa-6.1" />
 
     <!-- ArkUI NAPI 模块管理: sys 路径标记适配 -->
-    <project path="foundation/arkui/napi" name="arkui_napi" remote="hoa" revision="hoa" />
+    <project path="foundation/arkui/napi" name="arkui_napi" remote="hoa" revision="hoa-6.1" />
 
     <!-- 插件系统: WebView 等资源路径 sys 适配, hilog 插件 -->
-    <project path="plugins" name="plugins" remote="hoa" revision="hoa" />
+    <project path="plugins" name="plugins" remote="hoa" revision="hoa-6.1" />
 </manifest>
 MANIFEST
 
