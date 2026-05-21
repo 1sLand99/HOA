@@ -4,7 +4,7 @@
 
 ## 原理
 
-HOA 基于 ArkUI-X 的 Android 构建体系，通过 4 个定向 Patch 使运行时能够识别 OHOS 原生格式的 ABC 字节码，将 HAP 中的 ArkTS 页面渲染到 Android SurfaceView 上。
+HOA 基于 ArkUI-X 6.1-Release 的 Android 构建体系，通过 6 个仓库的定向适配使运行时能够加载并执行 OHOS 原生格式的 HAP，将 ArkTS 页面渲染到 Android SurfaceView 上。
 
 ```
 ┌─────────────────────────────────┐
@@ -18,9 +18,9 @@ HOA 基于 ArkUI-X 的 Android 构建体系，通过 4 个定向 Patch 使运行
            ▼
 ┌─────────────────────────────────┐
 │  HOA Application                │
-│  ├── StageApplication           │  ← ArkUI-X Android 适配器
+│  ├── StageApplication           │  ← ArkUI-X 6.1 Android 适配器
 │  ├── libarkui_android.so        │  ← 内嵌 ETS VM + ACE 渲染引擎
-│  └── OHOS HAP Mode Patches      │  ← ABC record 名匹配修复
+│  └── OHOS HAP Mode Patches      │  ← 6 仓库定向适配
 └──────────┬──────────────────────┘
            │
            ▼
@@ -30,7 +30,7 @@ HOA 基于 ArkUI-X 的 Android 构建体系，通过 4 个定向 Patch 使运行
 └─────────────────────────────────┘
 ```
 
-关键机制：Java 层通过 `setOhosHapMode(true)` 设置环境变量，经 JNI 传入 ETS VM，在模块路由时激活 OHOS 兼容路径（插入 `src/main/`、用 `&` 包裹 record 名），使 ArkUI-X 能正确加载 OHOS 编译的 ABC 文件。
+关键机制：Java 层通过 `setOhosHapMode(true)` 设置环境变量，经 JNI 传入 ETS VM，在模块路由时激活 OHOS 兼容路径（自动适配 SDK 5.0/6.0 ABC record 名格式差异），使 ArkUI-X 能正确加载 OHOS 编译的 ABC 文件。
 
 ## 构建
 
@@ -54,7 +54,7 @@ cd <hoa-project>
 
 ## 当前状态
 
-OHOS HAP "Hello World" 已在 Android 设备上端到端渲染成功
+ArkUI-X 6.1-Release 移植完成。5 个已安装 HAP 中 4 个正常渲染，支持安装/预览/启动/卸载全流程。详见 `agents/PROGRESS.md`。
 
 ## 相关文档
 

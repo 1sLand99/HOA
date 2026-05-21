@@ -1,5 +1,7 @@
 # OHOS HAP on Android — 技术调研文件索引
 
+> **当前状态** (2026-05-21): ArkUI-X 6.1-Release 移植完成，5 个仓库定向适配，5 个已安装 HAP 中 4 个正常渲染。详见 [PROGRESS.md](PROGRESS.md)。
+
 ## 项目目标
 
 在 Android 上直接运行 OpenHarmony 原生 HAP 包，参考 ArkUI-X 构建方案和 OHOS 原生运行机制。
@@ -102,15 +104,10 @@
 
 **缺点**: 需要 ETS 源码；本质上是"用 ArkUI-X 重组一个 App"而不是"直接运行已编译的 HAP"；与项目目标不符。
 
-### 当前方案 (technical-plan.md): 基于 ArkUI-X 构建自定义运行时
+### 当前方案 (已实施): 基于 ArkUI-X 6.1-Release 构建自定义运行时
 
-**思路**: 以 ArkUI-X 的 Android 构建体系为基础，对运行时中模块路由和 record 名解析的关键路径做定向补丁，使其同时兼容 OHOS HAP 格式和 ArkUI-X 格式。
+**思路**: 以 ArkUI-X 6.1-Release 的 Android 构建体系为基础，对运行时中模块路由、record 名解析、渲染管线初始化的关键路径做定向适配，使其兼容 OHOS HAP 格式。
 
-**核心修改**: `GetOutEntryPoint`、`ParseAbcPathAndOhmUrl`、`AdaptOldIsaRecord` 三个关键点。
+**实施范围**: 5 个仓库，10 个 cherry-pick + 9 个 manual commit。详见 [ARKUI-X_PATCHES.md](../docs/ARKUI-X_PATCHES.md)。
 
-1. **record 名双维度差异**: OHOS HAP ABC = `entry/src/main/ets/...`（无 bundleName，有 src/main/），ArkUI-X ABC = `{bundleName}/entry/ets/...`（有 bundleName，无 src/main/）。两个维度都需处理
-2. **ExecuteModuleBuffer 不可见**: 正确的执行函数在 libarkui_android.so 中是 hidden 符号，dlsym 无法访问
-3. **RunScriptForAbc 不是主入口**: 使用 NAPI 类型跳过所有路由，entry 不做任何转换
-4. **srcEntry→entryPoint 转换链已追踪**: 从 module.json5 到 CheckAndGetRecordInfo 每一步源码已核实（`srcEntry-to-entrypoint-chain.md`）
-5. **@ohos: 依赖需要 stub/mock**: OHOS HAP 引用系统模块 (hilog, UIAbility 等)，Android 上需要适配
-6. **ArkUI-X 复用 OHOS 核心**: VM 创建、DeclarativeFrontendNG、PipelineContext 等均可复用
+核心解决：ABC record 名双维度适配（SDK 5.0/6.0）、模块名拼接一致性（SplicingModuleName）、RSUIDirector 创建（6.1 白屏修复）、多实例渲染（RSClient + MultiInstance）。

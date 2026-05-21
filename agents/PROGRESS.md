@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-**里程碑**: 多 HAP 验证通过，完整管理闭环就绪（2026-05-18）。
+**里程碑**: ArkUI-X weekly_20260518 移植完成（2026-05-21），基于 `hoa` 分支 patch 创建 `hoa-weekly`，构建和运行时验证通过。
 
-5 个已安装 HAP 中 4 个正常渲染，轻松来记账因缺失 `libdata_distributedkvstore.so` 卡启动图的问题已修复。hw_base_calendar 因依赖华为专有 HMS SDK 无法运行（非 HOA 代码问题）。
+从 `hoa-6.1`（基于 ArkUI-X 6.1-Release，OHOS 内核 cut 于 2026-02-02）切换到 `weekly_20260518`（2026-05-18 最新 OHOS 同步），获得 3 个月的 OHOS 上游代码更新。manifest 分支: `ArkUI-X-6.1-Release` → `weekly`，repo revisions: `hoa-6.1` → `hoa-weekly`。
 
-用户管理流程完整：选择 HAP → 预览弹窗（应用信息/权限/Ability 列表）→ 确认安装 → 列表展示（含图标和名称）→ 长按查看详情/卸载 → 点击启动 → ArkUI-X 渲染。
+5 个已安装 HAP 中 4 个正常渲染。用户管理流程完整：选择 HAP → 预览弹窗 → 确认安装 → 列表展示 → 长按查看详情/卸载 → 点击启动 → ArkUI-X 渲染。
 
 ---
 
@@ -34,6 +34,34 @@
 ---
 
 ## 关键突破
+
+### 0. ArkUI-X 6.1-Release 移植（2026-05-21）
+
+基于旧版 ArkUI-X 的 `hoa` 分支 patch 全部移植到 `hoa-6.1`（6.1-Release）。共涉及 5 个仓库：
+
+| 仓库 | 已提交 (cherry-pick) | 新提交 (manual) |
+|------|---------------------|-----------------|
+| `arkcompiler/ets_runtime` | 2 | 0 |
+| `foundation/appframework` | 2 | 4 |
+| `foundation/arkui/ace_engine/adapter/android` | 3 | 4 |
+| `foundation/arkui/napi` | 2 | 0 |
+| `build` | 1 | 0 |
+
+**测试 HAP 白屏修复（最关键的 6.1 新问题）**——`RSUIDirector` 未创建：
+6.1 中 `Window::CreateSurfaceNode()` 直接调用 `RSSurfaceNode::Create(config)` 不传 `RSUIContext`，
+且 `GetRSUIDirector()`/`GetRSUIContext()` 均返回 `nullptr`。ArkUI-X 原生流程中 RSUIDirector 由外部
+注入，HOA 的 HAP 宿主流程无此环节。修复：`CreateSurfaceNode()` 中创建 `RSUIDirector`，将其
+`RSUIContext` 传入 `RSSurfaceNode::Create`，同时 `GetMultiInstanceEnabled()` 和
+`GetRSClientMultiInstanceEnabled()` 均改为 `true` 开启多实例渲染。
+
+**模块名拼接一致性**——`SplicingModuleName` 产生 `bundleName.moduleName`：
+HOA 解压 HAP 到 `filesDir/hap/<bundleName>.<moduleName>/`，`SplicingModuleName()` 将 `entry` 拼为
+`app.hackeris.harmonyexample.entry`（33 字符）。此全名是整条运行时链路的 canonical module key。
+`MAX_MODULE_NAME` 从 31 扩到 255 以容纳拼接名；`app_main.cpp` 动态模块路径使用拼接名；
+`module_profile.cpp` `TransformTo()` 将拼接名同步写入 `module.name` 和 `packageName`；
+`StageActivity.java` `setInstanceName` 同步拼接。
+
+详细变更见 `docs/ARKUI-X_PATCHES.md`。
 
 ### 1. resources.index 解析器重写（2026-05-18）
 
@@ -147,5 +175,6 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 | `agents/PLAN.md` | 完整技术方案、阻塞点分析、替代方案 |
 | `agents/PROGRESS.md` | 本文件，项目进展总览 |
 | `docs/BUILD.md` | 构建文档、sync 脚本用法、产物清单 |
-| `docs/ARKUI-X_PATCHES.md` | ArkUI-X 源码修改详细说明 |
+| `docs/ARKUI-X_PATCHES.md` | ArkUI-X 6.1-Release 源码修改详细说明 |
+| `scripts/setup_arkui_x.sh` | ArkUI-X 源码初始化（hoa-6.1 分支） |
 | `scripts/sync_arkui_x.sh` | 产物同步脚本 |
