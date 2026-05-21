@@ -1,7 +1,6 @@
 package app.hackeris.hoa
 
 import android.app.ActivityManager
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
 import ohos.stage.ability.adapter.StageActivity
@@ -142,7 +141,6 @@ open class HoaAbilityActivity : StageActivity() {
         }
 
         var displayName = bundleName
-        var bitmap: android.graphics.Bitmap? = null
 
         try {
             val json = JSONObject(moduleJsonFile.readText())
@@ -160,24 +158,13 @@ open class HoaAbilityActivity : StageActivity() {
                     displayName = rawLabel
                 }
             }
-
-            val moduleObj = json.getJSONObject("module")
-            val abilities = moduleObj.optJSONArray("abilities")
-            if (abilities != null) {
-                for (i in 0 until abilities.length()) {
-                    val ability = abilities.getJSONObject(i)
-                    if (ability.getString("name") == abilityName) {
-                        // Prefer startWindowIcon (splash), fall back to icon.
-                        val iconRef = ability.optString("startWindowIcon", "")
-                            .ifEmpty { ability.optString("icon", "") }
-                        bitmap = iconRefToBitmap(fullModuleName, iconRef)
-                        break
-                    }
-                }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "applyHapTaskDescription failed", e)
         }
+
+        val bitmap = app.hackeris.hoa.hap.HapBundleLoader.loadHapIcon(
+            File(filesDir, "hap/$fullModuleName")
+        )
 
         setTitle(displayName)
         @Suppress("DEPRECATION")
@@ -187,23 +174,6 @@ open class HoaAbilityActivity : StageActivity() {
             setTaskDescription(ActivityManager.TaskDescription(displayName))
         }
         Log.e(TAG, "applyHapTaskDescription: title=$displayName icon=${bitmap != null}")
-    }
-
-    // Resolve a "$media:name" reference to a Bitmap by trying common
-    // raster extensions in the "base" density bucket.  SVG is skipped.
-    private fun iconRefToBitmap(fullModuleName: String, iconRef: String): android.graphics.Bitmap? {
-        if (!iconRef.startsWith("\$media:")) return null
-        val mediaName = iconRef.removePrefix("\$media:")
-        val mediaDir = File(filesDir, "hap/$fullModuleName/resources/base/media")
-        if (!mediaDir.isDirectory) return null
-
-        for (ext in listOf("png", "jpg", "jpeg", "webp")) {
-            val file = File(mediaDir, "$mediaName.$ext")
-            if (file.exists()) {
-                return BitmapFactory.decodeFile(file.absolutePath)
-            }
-        }
-        return null
     }
 
     private fun moduleExists(bundleName: String, moduleName: String): Boolean {

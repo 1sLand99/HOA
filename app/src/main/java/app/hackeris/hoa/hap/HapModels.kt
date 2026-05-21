@@ -28,7 +28,8 @@ data class ModuleConfig(
     val pages: List<String>,
     val abilities: List<AbilityConfig>,
     val requestPermissions: List<String>,
-    val rawJson: String
+    val rawJson: String,
+    val iconId: Int = 0
 )
 
 data class AbilityConfig(
@@ -39,7 +40,8 @@ data class AbilityConfig(
     val exported: Boolean,
     val label: String,
     val icon: String,
-    val skills: List<SkillConfig>
+    val skills: List<SkillConfig>,
+    val iconId: Int = 0
 )
 
 data class SkillConfig(

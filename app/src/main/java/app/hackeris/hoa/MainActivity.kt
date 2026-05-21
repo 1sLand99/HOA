@@ -438,45 +438,9 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    // Loads the HAP icon bitmap for the shortcut.  Reuses the same
-    // resolution logic as the list adapter and task-description code.
+    // Loads the HAP icon bitmap for the shortcut.
     private fun loadHapIconBitmap(hap: InstalledHap): android.graphics.Bitmap? {
-        val fullModuleName = "${hap.bundleName}.${hap.moduleName}"
-        val moduleJsonFile = java.io.File(filesDir, "hap/$fullModuleName/module.json")
-        if (!moduleJsonFile.exists()) return null
-
-        try {
-            val json = org.json.JSONObject(moduleJsonFile.readText())
-            val moduleObj = json.getJSONObject("module")
-            val abilities = moduleObj.optJSONArray("abilities")
-            if (abilities != null) {
-                for (i in 0 until abilities.length()) {
-                    val ability = abilities.getJSONObject(i)
-                    if (ability.getString("name") == hap.mainAbility) {
-                        val iconRef = ability.optString("startWindowIcon", "")
-                            .ifEmpty { ability.optString("icon", "") }
-                        return loadBitmapFromRef(fullModuleName, iconRef)
-                    }
-                }
-            }
-        } catch (_: Exception) { }
-        return null
-    }
-
-    // Resolve "$media:name" to a Bitmap from resources/base/media/.
-    private fun loadBitmapFromRef(fullModuleName: String, iconRef: String): android.graphics.Bitmap? {
-        if (!iconRef.startsWith("\$media:")) return null
-        val mediaName = iconRef.removePrefix("\$media:")
-        val mediaDir = java.io.File(filesDir, "hap/$fullModuleName/resources/base/media")
-        if (!mediaDir.isDirectory) return null
-
-        for (ext in listOf("png", "jpg", "jpeg", "webp")) {
-            val file = java.io.File(mediaDir, "$mediaName.$ext")
-            if (file.exists()) {
-                return android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-            }
-        }
-        return null
+        return HapBundleLoader.loadHapIcon(hap.contentDir, hap.moduleConfig)
     }
 
     private inner class HapListAdapter : BaseAdapter() {
@@ -526,41 +490,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         private fun loadHapIcon(hap: InstalledHap): android.graphics.Bitmap? {
-            val fullModuleName = "${hap.bundleName}.${hap.moduleName}"
-            val moduleJsonFile = java.io.File(filesDir, "hap/$fullModuleName/module.json")
-            if (!moduleJsonFile.exists()) return null
-
-            try {
-                val json = org.json.JSONObject(moduleJsonFile.readText())
-                val moduleObj = json.getJSONObject("module")
-                val abilities = moduleObj.optJSONArray("abilities")
-                if (abilities != null) {
-                    for (i in 0 until abilities.length()) {
-                        val ability = abilities.getJSONObject(i)
-                        if (ability.getString("name") == hap.mainAbility) {
-                            val iconRef = ability.optString("startWindowIcon", "")
-                                .ifEmpty { ability.optString("icon", "") }
-                            return loadBitmapFromRef(fullModuleName, iconRef)
-                        }
-                    }
-                }
-            } catch (_: Exception) { }
-            return null
-        }
-
-        private fun loadBitmapFromRef(fullModuleName: String, iconRef: String): android.graphics.Bitmap? {
-            if (!iconRef.startsWith("\$media:")) return null
-            val mediaName = iconRef.removePrefix("\$media:")
-            val mediaDir = java.io.File(filesDir, "hap/$fullModuleName/resources/base/media")
-            if (!mediaDir.isDirectory) return null
-
-            for (ext in listOf("png", "jpg", "jpeg", "webp")) {
-                val file = java.io.File(mediaDir, "$mediaName.$ext")
-                if (file.exists()) {
-                    return android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                }
-            }
-            return null
+            return HapBundleLoader.loadHapIcon(hap.contentDir, hap.moduleConfig)
         }
     }
 

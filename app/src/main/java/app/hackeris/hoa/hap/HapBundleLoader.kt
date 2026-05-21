@@ -106,6 +106,7 @@ class HapBundleLoader {
         val compileSdkVersion = appObj?.optString("compileSdkVersion", "") ?: ""
         val targetApiVersion = appObj?.optInt("targetAPIVersion", 0) ?: 0
         val minApiVersion = appObj?.optInt("minAPIVersion", 0) ?: 0
+        val appIconId = appObj?.optInt("iconId", 0) ?: 0
 
         val name = moduleObj.getString("name")
         val type = moduleObj.getString("type")
@@ -143,7 +144,8 @@ class HapBundleLoader {
             pages = pages,
             abilities = abilities,
             requestPermissions = requestPermissions,
-            rawJson = rawJson
+            rawJson = rawJson,
+            iconId = appIconId
         )
     }
 
@@ -194,7 +196,8 @@ class HapBundleLoader {
             exported = obj.optBoolean("exported", false),
             label = obj.optString("label", ""),
             icon = obj.optString("icon", ""),
-            skills = skills
+            skills = skills,
+            iconId = obj.optInt("iconId", 0)
         )
     }
 
@@ -473,6 +476,259 @@ class HapBundleLoader {
                     }
                 }
             }
+            return null
+        }
+
+        // ---- Media path resolution by resource ID ----
+
+        /**
+         * Resolves a numeric iconId to its file path using resources.index.
+         *
+         * Returns the path relative to the HAP root, e.g.
+         * "entry/resources/base/media/icon.png" or null if not found.
+         */
+        fun resolveMediaPathById(moduleDir: java.io.File, iconId: Int): String? {
+            if (iconId == 0) return null
+            val indexFile = java.io.File(moduleDir, "resources.index")
+            if (!indexFile.exists()) return null
+            val data = try { indexFile.readBytes() } catch (_: Exception) { return null }
+
+            val versionPrefix = if (data.size >= 10) {
+                String(data, 0, minOf(10, data.size), Charsets.UTF_8)
+            } else ""
+            return if (versionPrefix.startsWith("RestoolV2")) {
+                resolveMediaPathByIdV2(data, iconId)
+            } else {
+                resolveMediaPathByIdV1(data, iconId)
+            }
+        }
+
+        private fun resolveMediaPathByIdV2(data: ByteArray, iconId: Int): String? {
+            if (data.size < 140) return null
+            val keyCount = readInt32LE(data, 132)
+            val dataBlockOffset = readInt32LE(data, 136)
+            if (keyCount <= 0 || keyCount > 100) return null
+            if (dataBlockOffset <= 0 || dataBlockOffset >= data.size) return null
+
+            var pos = 140
+            for (i in 0 until keyCount) {
+                if (pos + 12 > data.size) return null
+                val kpCount = readInt32LE(data, pos + 8)
+                if (kpCount > 20) return null
+                pos += 12 + kpCount * 8
+            }
+
+            if (pos + 16 > data.size) return null
+            val typeCount = readInt32LE(data, pos + 8)
+            pos += 16
+
+            for (t in 0 until typeCount) {
+                if (pos + 12 > dataBlockOffset) return null
+                val count = readInt32LE(data, pos + 8)
+                pos += 12
+
+                for (i in 0 until count) {
+                    if (pos + 12 > dataBlockOffset) return null
+                    val resId = readInt32LE(data, pos)
+                    val resInfoOffset = readInt32LE(data, pos + 4)
+                    val nameLen = readInt32LE(data, pos + 8)
+                    if (nameLen <= 0 || nameLen > 200) return null
+                    if (pos + 12 + nameLen > data.size) return null
+
+                    if (resId == iconId) {
+                        return readV2Value(data, resInfoOffset)
+                    }
+                    pos += 12 + nameLen
+                }
+            }
+            return null
+        }
+
+        private fun resolveMediaPathByIdV1(data: ByteArray, iconId: Int): String? {
+            if (data.size < 136) return null
+            val keyCount = readInt32LE(data, 132)
+            if (keyCount <= 0 || keyCount > 100) return null
+
+            var pos = 136
+            for (ki in 0 until keyCount) {
+                if (pos + 12 > data.size) return null
+                val tag = String(data, pos, 4, Charsets.UTF_8)
+                if (tag != "KEYS") return null
+                val idssOffset = readInt32LE(data, pos + 4)
+                val kpCount = readInt32LE(data, pos + 8)
+                if (kpCount > 20) return null
+                pos += 12 + kpCount * 8
+
+                if (idssOffset + 8 > data.size) continue
+                val idssTag = String(data, idssOffset, 4, Charsets.UTF_8)
+                if (idssTag != "IDSS") continue
+                val idCount = readInt32LE(data, idssOffset + 4)
+                if (idCount <= 0 || idCount > 500) continue
+
+                var ipPos = idssOffset + 8
+                for (ii in 0 until idCount) {
+                    if (ipPos + 8 > data.size) break
+                    val ipId = readInt32LE(data, ipPos)
+                    val itemOffset = readInt32LE(data, ipPos + 4)
+                    ipPos += 8
+
+                    if (ipId != iconId) continue
+                    if (itemOffset + 12 > data.size) continue
+                    val itemSize = readInt32LE(data, itemOffset)
+                    val resType = readInt32LE(data, itemOffset + 4)
+                    if (itemSize < 14 || itemSize > 5000) continue
+
+                    var itemPos = itemOffset + 12
+                    val isArray = (resType == 10 || resType == 11 || resType == 16 ||
+                                   resType == 17 || resType == 22)
+                    if (isArray) {
+                        if (itemPos + 2 > data.size) continue
+                        val arrLen = readUInt16LE(data, itemPos)
+                        if (arrLen < 1 || arrLen > 5000) continue
+                        itemPos += 2 + arrLen + 1
+                    } else {
+                        if (itemPos + 2 > data.size) continue
+                        val valLen = readUInt16LE(data, itemPos)
+                        if (valLen < 1 || valLen > 5000) continue
+                        if (itemPos + 2 + valLen > data.size) continue
+                        return String(data, itemPos + 2, valLen - 1, Charsets.UTF_8)
+                    }
+                }
+            }
+            return null
+        }
+
+        // ---- Consolidated HAP icon loading ----
+
+        /**
+         * Loads the icon for an installed HAP given only its module directory.
+         * Reads module.json from the directory to obtain the config.
+         */
+        fun loadHapIcon(moduleDir: java.io.File): android.graphics.Bitmap? {
+            val moduleJsonFile = java.io.File(moduleDir, "module.json")
+            if (!moduleJsonFile.exists()) return null
+            return try {
+                val rawJson = moduleJsonFile.readText()
+                val config = HapBundleLoader().parseModuleJson(rawJson, null)
+                loadHapIcon(moduleDir, config)
+            } catch (_: Exception) { null }
+        }
+
+        /**
+         * Loads the best icon for an installed HAP.
+         *
+         * Algorithm:
+         * 1. Reads module.json from the installed module directory.
+         * 2. Finds the ability matching module.mainElement, uses its iconId.
+         *    Falls back to app.iconId if the ability has none.
+         * 3. Resolves iconId → file path via resources.index.
+         * 4. Reads the file from disk.  Handles .json layered icons by
+         *    compositing foreground + background into a single PNG.
+         */
+        fun loadHapIcon(moduleDir: java.io.File, config: ModuleConfig): android.graphics.Bitmap? {
+            // Step 1-2: determine iconId
+            var iconId = 0
+            val mainAbility = config.abilities.find { it.name == config.mainElement }
+            if (mainAbility != null && mainAbility.iconId != 0) {
+                iconId = mainAbility.iconId
+            }
+            if (iconId == 0) {
+                iconId = config.iconId
+            }
+            if (iconId == 0) return null
+
+            // Step 3: resolve iconId → file path via resources.index
+            val iconPath = resolveMediaPathById(moduleDir, iconId) ?: return null
+
+            val iconFile = java.io.File(moduleDir, stripModulePrefix(iconPath))
+            if (!iconFile.exists()) return null
+
+            // Step 4: read the file
+            return when {
+                iconFile.extension.equals("json", ignoreCase = true) ->
+                    loadLayeredIcon(moduleDir, iconFile)
+                iconFile.extension.equals("svg", ignoreCase = true) ->
+                    loadSvgAsPng(iconFile)
+                else ->
+                    android.graphics.BitmapFactory.decodeFile(iconFile.absolutePath)
+            }
+        }
+
+        private fun loadLayeredIcon(moduleDir: java.io.File, jsonFile: java.io.File): android.graphics.Bitmap? {
+            return try {
+                val json = org.json.JSONObject(jsonFile.readText())
+                val layered = json.optJSONObject("layered-image") ?: return null
+                val bgRef = layered.optString("background", "")
+                val fgRef = layered.optString("foreground", "")
+
+                val bgBitmap = resolveMediaRef(moduleDir, bgRef)
+                val fgBitmap = resolveMediaRef(moduleDir, fgRef)
+
+                if (bgBitmap == null && fgBitmap == null) return null
+                val bg = bgBitmap ?: fgBitmap!!
+                val fg = fgBitmap ?: return bg
+
+                val width = maxOf(bg.width, fg.width)
+                val height = maxOf(bg.height, fg.height)
+                val result = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(result)
+                canvas.drawBitmap(bg, 0f, 0f, null)
+                canvas.drawBitmap(fg, 0f, 0f, null)
+                result
+            } catch (_: Exception) { null }
+        }
+
+        private fun resolveMediaRef(moduleDir: java.io.File, ref: String): android.graphics.Bitmap? {
+            if (!ref.startsWith("\$media:")) return null
+            val mediaKey = ref.removePrefix("\$media:")
+
+            // $media:123456 — numeric resource ID, resolve via resources.index
+            val numericId = mediaKey.toIntOrNull()
+            if (numericId != null && numericId > 0) {
+                val path = resolveMediaPathById(moduleDir, numericId)
+                if (path != null) {
+                    val normalizedPath = stripModulePrefix(path)
+                    val file = java.io.File(moduleDir, normalizedPath)
+                    if (file.exists()) {
+                        return android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                    }
+                }
+                return null
+            }
+
+            // $media:name — named resource, resolve via resources.index name lookup
+            val mediaPath = parseStringFromIndex(moduleDir, mediaKey)
+            if (mediaPath != null) {
+                val normalizedPath = stripModulePrefix(mediaPath)
+                val file = java.io.File(moduleDir, normalizedPath)
+                if (file.exists()) {
+                    return android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                }
+            }
+
+            // Fallback: search resources/base/media/ by filename
+            val mediaDir = java.io.File(moduleDir, "resources/base/media")
+            if (mediaDir.isDirectory) {
+                for (ext in listOf("png", "jpg", "jpeg", "webp")) {
+                    val file = java.io.File(mediaDir, "$mediaKey.$ext")
+                    if (file.exists()) {
+                        return android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                    }
+                }
+            }
+            return null
+        }
+
+        private fun stripModulePrefix(path: String): String {
+            val slashIdx = path.indexOf('/')
+            return if (slashIdx > 0 && slashIdx < path.length - 1) {
+                path.substring(slashIdx + 1)
+            } else path
+        }
+
+        private fun loadSvgAsPng(svgFile: java.io.File): android.graphics.Bitmap? {
+            // SVG rendering requires an external library — not implemented.
+            // Return null so callers fall back to the default icon.
             return null
         }
 
