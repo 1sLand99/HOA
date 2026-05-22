@@ -42,7 +42,7 @@ HOA 基于 ArkUI-X weekly_20260518 的 Android 构建体系，通过 6 个仓库
 repo init (HOA manifest) → prebuilts_download.sh → build.sh → sync_arkui_x.sh → gradlew assembleDebug
 ```
 
-首次构建约 30 分钟，磁盘需求约 100GB。后续增量构建 2-5 分钟。
+构建耗时数小时不等，视机器性能和网络状况而定。磁盘需求约 100GB（源码 + 产物）。
 
 ## 运行
 

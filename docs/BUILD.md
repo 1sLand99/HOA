@@ -16,7 +16,7 @@ repo init (HOA manifest)
         → ./gradlew assembleDebug (APK 打包)
 ```
 
-总耗时约 30 分钟（首次），磁盘需求约 100GB（源码 + 产物）。后续增量构建 2-5 分钟。
+构建耗时数小时不等，视机器性能和网络状况而定。磁盘需求约 100GB（源码 + 产物）。
 
 ---
 
@@ -86,7 +86,7 @@ bash build/prebuilts_download.sh --build-arkuix --skip-ssl
 | `--gn-args` | 额外 GN 参数 |
 | `--log-level info` | 日志等级，可选 `info` / `debug` |
 
-> **注意**: 首次构建约需 30 分钟。后续增量构建只需 2-5 分钟。
+> **注意**: 首次构建耗时较长（数小时不等），后续增量构建较快。
 
 ---
 
@@ -157,39 +157,6 @@ cd /path/to/HOA
 
 ---
 
-## HOA 定制仓库
-
-以下 6 个仓库被 override 为 [harmony-on-android](https://gitcode.com/harmony-on-android) 组织的 fork（`hoa-weekly` 分支）：
-
-| 仓库 | 源码路径 | 主要修改 |
-|------|---------|---------|
-| **arkcompiler_ets_runtime** | `arkcompiler/ets_runtime` | OHOS HAP ABC record 名适配（SDK 5.0/6.0 双格式兼容） |
-| **build** | `build` | GN 构建模板 Android NDK 交叉编译适配 |
-| **app_framework** | `foundation/appframework` | OHOS_HAP_MODE 环境变量注入 VM 标志位、hapPath 前缀 |
-| **arkui_for_android** | `foundation/arkui/ace_engine/adapter/android` | RSUIDirector 创建（白屏修复）、WebView shouldInterceptRequest 拦截、JNI setenv 桥接、resources.index 路径修复 |
-| **arkui_napi** | `foundation/arkui/napi` | Android NAPI .abc 路径修复、资源路径标记适配 |
-| **plugins** | `plugins` | 权限 JNI 检查绕过、webview 资源路径适配 |
-
-全部修改已提交到 `hoa-weekly` 分支（基于 ArkUI-X weekly_20260518）。详细说明见 `docs/ARKUI-X_PATCHES.md`。
-
----
-
-## 标志传递链
-
-OHOS HAP 模式通过以下链路从 Java 层传递到 C++ VM：
-
-```
-HoaApplication.kt
-  → StageApplication.setOhosHapMode(true)       [arkui_for_android]
-    → JNI nativeSetOhosHapMode                  [arkui_for_android]
-      → setenv("OHOS_HAP_MODE", "1")            [arkui_for_android]
-        → js_runtime.cpp 读取环境变量           [app_framework]
-          → JSNApi::SetOhosHapMode(vm_, true)   [arkcompiler_ets_runtime]
-            → IsOhosHapMode() 分支判断          [arkcompiler_ets_runtime]
-```
-
----
-
 ## 项目结构
 
 ```
@@ -211,45 +178,6 @@ HOA/
     ├── PROGRESS.md
     └── test-hap-analysis.md
 ```
-
----
-
-## Troubleshooting
-
-### repo init 失败
-
-确认网络可访问 `gitcode.com`。如果在受限网络环境，可尝试代理：
-
-```bash
-export HTTP_PROXY=http://proxy:port
-export HTTPS_PROXY=http://proxy:port
-```
-
-### build.sh 报 "OS version not supported"
-
-ArkUI-X 构建脚本内置了 OS 版本检查。如果系统是较新版本（如 Ubuntu 24.04），在 `build.sh` 的 OS 版本检查逻辑中添加对应版本号。
-
-### prebuilts_download.sh 下载失败 (SSL)
-
-使用 `--skip-ssl` 参数跳过 SSL 验证：
-
-```bash
-bash build/prebuilts_download.sh --build-arkuix --skip-ssl
-```
-
-### APK 体积过大
-
-`libarkui_android.so` (~82MB) 是体积最大的单文件——内含完整 ArkUI-X 引擎、ETS VM、Skia。这是架构决定的，无法有效削减。
-
-### 构建失败，提示 .so 缺失
-
-先运行 `./scripts/sync_arkui_x.sh` 确保所有 ArkUI-X 产物已同步到项目。
-
-### resources.index 不匹配
-
-如果 HAP 内 `$r()` 引用资源失败，检查：
-1. `HapInstaller` 是否正确写入 `files/hap/{bundleName}.{moduleName}/resources.index`
-2. `StageAssetProvider::Preload()` 是否从 `files/hap/` 正确复制到 `files/sys/`
 
 ---
 
