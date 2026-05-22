@@ -1,4 +1,4 @@
-# ArkUI-X 6.1-Release 移植 Patch 记录
+# ArkUI-X weekly_20260518 移植 Patch 记录
 
 > 源码根目录: `/data/share/hoa2/arkui-x`（repo 管理，含多个独立 git 仓库）
 >
@@ -6,11 +6,11 @@
 
 ## 涉及仓库总览
 
-| 仓库 | 上游 | 已提交 (cherry-pick) | 未提交 (manual) |
-|------|------|---------------------|-----------------|
+| 仓库 | 上游 | 已提交 (cherry-pick) | 新增 (hoa-weekly) |
+|------|------|---------------------|-------------------|
 | `arkcompiler/ets_runtime` | `openharmony/arkcompiler_ets_runtime` | 2 | 0 |
 | `foundation/appframework` | `arkui-x/app_framework` | 2 | 4 |
-| `foundation/arkui/ace_engine/adapter/android` | `arkui-x/arkui_for_android` | 3 | 5 |
+| `foundation/arkui/ace_engine/adapter/android` | `arkui-x/arkui_for_android` | 3 | 6 |
 | `foundation/arkui/napi` | `openharmony/arkui_napi` | 2 | 0 |
 | `build` | `openharmony/build` | 1 | 0 |
 
@@ -18,7 +18,7 @@
 
 ## 1. arkcompiler/ets_runtime（ETS 运行时 VM）
 
-### 已提交 (hoa-6.1, cherry-picked)
+### 已提交 (cherry-pick from hoa)
 
 #### 1.1 `f91786229` — Read OHOS_HAP_MODE env var to set VM flag
 
@@ -46,7 +46,7 @@ SDK 5.0 和 6.0 的 ABC record 名格式不同。SDK 6.0 使用 `bundleName/entr
 
 ## 2. foundation/appframework（应用框架）
 
-### 已提交 (hoa-6.1, cherry-picked)
+### 已提交 (cherry-pick from hoa)
 
 #### 2.1 `670f516` — Read OHOS_HAP_MODE env var to set VM flag
 
@@ -57,7 +57,7 @@ SDK 5.0 和 6.0 的 ABC record 名格式不同。SDK 6.0 使用 `bundleName/entr
 - `ability_stage.cpp` — `abilityInfo->hapPath = "hap/" + abilityInfo->moduleName + "/";`
 - `app_main.cpp` — 配套将路径前缀改为 `hap/`
 
-### 未提交 (manual patches on top of hoa-6.1)
+### 新增 (hoa-weekly)
 
 #### 2.3 `app_main.cpp` — 动态模块路径使用 GetSplicingModuleName
 
@@ -89,7 +89,7 @@ HOA 中 `SplicingModuleName()` 将 `entry` 拼接为 `app.hackeris.harmonyexampl
 
 ## 3. foundation/arkui/ace_engine/adapter/android（Android 适配器）
 
-### 已提交 (hoa-6.1, cherry-picked)
+### 已提交 (cherry-pick from hoa)
 
 #### 3.1 `6087ae2` — Add SetOhosHapMode JNI bridge and Java API
 
@@ -105,7 +105,7 @@ HOA 中 `SplicingModuleName()` 将 `entry` 拼接为 `app.hackeris.harmonyexampl
 
 系统资源 assets 目录从 `arkui-x/` 改为 `sys/`，与 HOA 项目中的 assets 结构一致。
 
-### 未提交 (manual patches on top of hoa-6.1)
+### 新增 (hoa-weekly)
 
 #### 3.4 `virtual_rs_window.cpp` — 创建 RSUIDirector 并使用 RSUIContext（白屏修复，核心）
 
@@ -158,11 +158,22 @@ if (isExistDir(modulePath) && nameArray.length >= 4) {
 
 新增 `private static final int STUB_COPY_BUFFER_SIZE = 8192;`。
 
+#### 3.9 `AceWeb.java` — WebView 加载 HAP 资源 ERR_ACCESS_DENIED 修复（2026-05-22）
+
+Chrome WebView 118+ 在导航层直接拦截 `file://` URL，不调用 `shouldInterceptRequest`，`setAllowFileAccess(true)` 无效。ArkUI-X 的 `GetRawFileUrl()` 返回裸路径 `/data/user/0/.../rawfile/xxx.html`，Android WebView 内部自动补 `file://` 前缀后被拦截。
+
+**修复策略**: 将 `file://` 和裸 `/data/` 路径改写为 `http://hoa.internal/` 虚拟主机 URL，在 `shouldInterceptRequest` 中拦截并提供文件内容。
+
+- `rewriteFileUrl()` — 三个 `loadUrl` 入口处转换 URL scheme
+- `handleFileRequest()` — 识别 `hoa.internal` 主机，通过 `FileInputStream` 返回 `WebResourceResponse`
+- `guessMimeType()` — 根据扩展名判断 MIME 类型
+- 恢复 `setAllowFileAccess(true)` / `setAllowContentAccess(true)`（对子资源加载仍有帮助）
+
 ---
 
 ## 4. foundation/arkui/napi（NAPI 模块加载）
 
-### 已提交 (hoa-6.1, cherry-picked)
+### 已提交 (cherry-pick from hoa)
 
 #### 4.1 `81238fd7` — fix(arkui_napi): 修复 Android 平台 NAPI 模块 .abc 路径加载失败
 
@@ -176,7 +187,7 @@ if (isExistDir(modulePath) && nameArray.length >= 4) {
 
 ## 5. build（GN 构建系统）
 
-### 已提交 (hoa-6.1, cherry-picked)
+### 已提交 (cherry-pick from hoa)
 
 #### 5.1 `3ec47ab1` — 支持在 is_arkui_x=true 条件下能正常跑通 Android 交叉编译
 
@@ -216,16 +227,16 @@ override fun onCreate() {
 
 ---
 
-## 未提交变更明细
+## 新增变更明细
 
-以下变更尚未 commit 到 hoa-6.1：
+以下变更已提交到 hoa-weekly（非 cherry-pick，直接创建的新 patch）：
 
 ### foundation/appframework
 | 文件 | 变更 |
 |------|------|
-| `app_main.cpp` | GetSplicingModuleName 动态模块路径 + debug 日志 |
+| `app_main.cpp` | GetSplicingModuleName 动态模块路径 |
 | `bundle_constants.h` | MAX_MODULE_NAME 31 → 255 |
-| `module_profile.cpp` | 校验日志 + TransformTo 拼接行为恢复 |
+| `module_profile.cpp` | TransformTo 拼接行为恢复 |
 | `rs_system_properties.cpp` | GetRSClientMultiInstanceEnabled() → true |
 
 ### foundation/arkui/ace_engine/adapter/android
@@ -236,6 +247,7 @@ override fun onCreate() {
 | `osal/system_properties.cpp` | GetMultiInstanceEnabled() → true |
 | `StageActivity.java` | setInstanceName 拼接逻辑 |
 | `StageApplicationDelegate.java` | STUB_COPY_BUFFER_SIZE 常量 |
+| `AceWeb.java` | WebView HAP 资源加载 shouldInterceptRequest 拦截 |
 
 ---
 
