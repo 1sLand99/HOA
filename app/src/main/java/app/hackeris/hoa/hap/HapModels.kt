@@ -3,10 +3,6 @@ package app.hackeris.hoa.hap
 data class HapBundle(
     val hapFile: String,
     val moduleConfig: ModuleConfig,
-    val bytecodeEntries: Map<String, ByteArray>,
-    val resourceIndex: ByteArray?,
-    val rawResources: Map<String, ByteArray>,
-    val nativeLibs: Map<String, ByteArray>,
     val packInfo: PackInfo?
 )
 

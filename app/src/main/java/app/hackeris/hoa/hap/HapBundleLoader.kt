@@ -58,19 +58,11 @@ class HapBundleLoader {
 
         try {
             val moduleConfig = parseModuleConfig(zip)
-            val bytecodeEntries = extractBytecode(zip)
-            val resourceIndex = extractResourceIndex(zip)
-            val rawResources = extractResources(zip)
-            val nativeLibs = extractNativeLibs(zip)
             val packInfo = extractPackInfo(zip)
 
             return HapBundle(
                 hapFile = hapPath,
                 moduleConfig = moduleConfig,
-                bytecodeEntries = bytecodeEntries,
-                resourceIndex = resourceIndex,
-                rawResources = rawResources,
-                nativeLibs = nativeLibs,
                 packInfo = packInfo
             )
         } finally {
@@ -199,48 +191,6 @@ class HapBundleLoader {
             skills = skills,
             iconId = obj.optInt("iconId", 0)
         )
-    }
-
-    private fun extractBytecode(zip: ZipFile): Map<String, ByteArray> {
-        val result = mutableMapOf<String, ByteArray>()
-        for (path in listOf("ets/modules.abc", "ets/modules_static.abc")) {
-            zip.getEntry(path)?.let { entry ->
-                result[path] = zip.getInputStream(entry).use { it.readBytes() }
-            }
-        }
-        return result
-    }
-
-    private fun extractResourceIndex(zip: ZipFile): ByteArray? {
-        return zip.getEntry("resources.index")?.let { entry ->
-            zip.getInputStream(entry).use { it.readBytes() }
-        }
-    }
-
-    private fun extractResources(zip: ZipFile): Map<String, ByteArray> {
-        val result = mutableMapOf<String, ByteArray>()
-        val entries = zip.entries()
-        while (entries.hasMoreElements()) {
-            val entry = entries.nextElement()
-            val name = entry.name
-            if (name.startsWith("resources/") && !entry.isDirectory) {
-                result[name] = zip.getInputStream(entry).use { it.readBytes() }
-            }
-        }
-        return result
-    }
-
-    private fun extractNativeLibs(zip: ZipFile): Map<String, ByteArray> {
-        val result = mutableMapOf<String, ByteArray>()
-        val entries = zip.entries()
-        while (entries.hasMoreElements()) {
-            val entry = entries.nextElement()
-            val name = entry.name
-            if (name.startsWith("libs/") && name.endsWith(".so") && !entry.isDirectory) {
-                result[name] = zip.getInputStream(entry).use { it.readBytes() }
-            }
-        }
-        return result
     }
 
     private fun extractPackInfo(zip: ZipFile): PackInfo? {

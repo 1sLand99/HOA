@@ -4,6 +4,7 @@ import android.content.Context
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
+import java.util.zip.ZipFile
 
 data class InstalledHap(
     val bundleName: String,
@@ -57,30 +58,41 @@ class HapInstaller(private val context: Context) {
         // Write module.json
         File(targetDir, "module.json").writeText(bundle.moduleConfig.rawJson)
 
-        // Write .abc bytecode
-        bundle.bytecodeEntries.forEach { (path, data) ->
-            val file = File(targetDir, path)
-            file.parentFile?.mkdirs()
-            file.writeBytes(data)
-        }
+        // Stream files directly from ZIP to disk to avoid OOM on large HAPs.
+        ZipFile(bundle.hapFile).use { zip ->
+            // .abc bytecode
+            for (path in listOf("ets/modules.abc", "ets/modules_static.abc")) {
+                zip.getEntry(path)?.let { entry ->
+                    val file = File(targetDir, path)
+                    file.parentFile?.mkdirs()
+                    zip.getInputStream(entry).use { input ->
+                        file.outputStream().use { out -> input.copyTo(out) }
+                    }
+                }
+            }
 
-        // Write resources.index
-        bundle.resourceIndex?.let { data ->
-            File(targetDir, "resources.index").writeBytes(data)
-        }
+            // resources.index
+            zip.getEntry("resources.index")?.let { entry ->
+                val file = File(targetDir, "resources.index")
+                zip.getInputStream(entry).use { input ->
+                    file.outputStream().use { out -> input.copyTo(out) }
+                }
+            }
 
-        // Write resource files
-        bundle.rawResources.forEach { (path, data) ->
-            val file = File(targetDir, path)
-            file.parentFile?.mkdirs()
-            file.writeBytes(data)
-        }
-
-        // Write native libs
-        bundle.nativeLibs.forEach { (path, data) ->
-            val file = File(targetDir, path)
-            file.parentFile?.mkdirs()
-            file.writeBytes(data)
+            // Resource files under resources/
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                val name = entry.name
+                if ((name.startsWith("resources/") || (name.startsWith("libs/") && name.endsWith(".so")))
+                    && !entry.isDirectory) {
+                    val file = File(targetDir, name)
+                    file.parentFile?.mkdirs()
+                    zip.getInputStream(entry).use { input ->
+                        file.outputStream().use { out -> input.copyTo(out) }
+                    }
+                }
+            }
         }
 
         // Write pkgContextInfo.json (required by StageAssetProvider.GetPkgJsonBuffer)
