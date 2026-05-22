@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote fetch="https://gitcode.com/harmony-on-android" name="hoa" />
+
+  <!-- ArkUI-X baseline: pull all non-customized repos -->
+  <include name="default.xml" />
+
+  <!-- HOA customized repos: override to harmony-on-android / hoa-weekly branch -->
+  <project path="arkcompiler/ets_runtime" name="arkcompiler_ets_runtime"
+           remote="hoa" revision="hoa-weekly" />
+  <project path="build" name="build"
+           remote="hoa" revision="hoa-weekly" />
+  <project path="foundation/appframework" name="app_framework"
+           remote="hoa" revision="hoa-weekly" />
+  <project path="foundation/arkui/ace_engine/adapter/android"
+           name="arkui_for_android" remote="hoa" revision="hoa-weekly" />
+  <project path="foundation/arkui/napi" name="arkui_napi"
+           remote="hoa" revision="hoa-weekly" />
+  <project path="plugins" name="plugins"
+           remote="hoa" revision="hoa-weekly" />
+</manifest>

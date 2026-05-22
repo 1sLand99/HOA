@@ -35,9 +35,16 @@ HOA 基于 ArkUI-X weekly_20260518 的 Android 构建体系，通过 6 个仓库
 ## 构建
 
 ```bash
-cd <arkui-x-source>
+# 1. 获取 ArkUI-X 源码
+repo init -u https://gitcode.com/harmony-on-android/manifest \
+          -b hoa-weekly -m hoa-weekly.xml
+repo sync -j4
+bash build/prebuilts_download.sh --skip-ssl
+
+# 2. 构建 ArkUI-X
 ./build.sh --product-name arkui-x --target-os android
 
+# 3. 同步产物到 HOA 项目并打包 APK
 cd <hoa-project>
 ./scripts/sync_arkui_x.sh
 ./gradlew assembleDebug
