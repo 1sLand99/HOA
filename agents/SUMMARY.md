@@ -66,6 +66,7 @@
 ### 验证与评估
 
 - [information-gap-analysis.md](information-gap-analysis.md) — 信息充分性评估：8 项交叉验证结果、6 个信息缺口及影响等级、补充探索优先级
+- [api-coverage.md](api-coverage.md) — **OHOS API 兼容性分析**：对照 OHOS SDK 619 个 API 声明文件，梳理 ArkUI-X 已支持的 152 个模块、缺失的 P0/P1/P2 级 API 及扩展建议
 
 ### 技术方案
 
