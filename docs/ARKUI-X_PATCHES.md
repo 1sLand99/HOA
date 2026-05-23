@@ -10,9 +10,11 @@
 |------|------|---------------------|-------------------|
 | `arkcompiler/ets_runtime` | `openharmony/arkcompiler_ets_runtime` | 2 | 0 |
 | `foundation/appframework` | `arkui-x/app_framework` | 2 | 4 |
-| `foundation/arkui/ace_engine/adapter/android` | `arkui-x/arkui_for_android` | 3 | 6 |
+| `foundation/arkui/ace_engine/adapter/android` | `arkui-x/arkui_for_android` | 3 | 7 |
 | `foundation/arkui/napi` | `openharmony/arkui_napi` | 2 | 0 |
 | `build` | `openharmony/build` | 1 | 0 |
+| `plugins` | `arkui-x/plugins` | 0 | 3 |
+| `build_plugins` | `arkui-x/build_plugins` | 0 | 0 |
 
 ---
 
@@ -169,6 +171,18 @@ Chrome WebView 118+ 在导航层直接拦截 `file://` URL，不调用 `shouldIn
 - `guessMimeType()` — 根据扩展名判断 MIME 类型
 - 恢复 `setAllowFileAccess(true)` / `setAllowContentAccess(true)`（对子资源加载仍有帮助）
 
+#### 3.10 `AceWebPluginAosp.java` — Web 组件 `src` 属性 `resource://rawfile/` URL 解析（2026-05-23）
+
+Web 组件的 `src` 属性设置声明式路径（`Web({ src: "resource://rawfile/..." })`）与程序化 `controller.loadUrl()` 走两套独立的代码路径。`loadUrl()` 路径在 `js_web_webview.cpp` 的 NAPI 层处理 rawfile 转换，但声明式路径经过 appframework 跨平台 resource register → Java `AceWebPluginAosp.create()` → `toAndroidAssetUrl()`，后者无法识别 `resource://rawfile/` scheme，导致 Android WebView 报 `ERR_UNKNOWN_URL_SCHEME`。
+
+**修复策略**: 在 `toAndroidAssetUrl()` 中新增 `resource://rawfile/` 前缀检测，扫描 `files/hap/` 下各 HAP 的 `resources/rawfile/` 子目录定位实际文件，转换为 `file://` URL 后交给 `rewriteFileUrl()` / `handleFileRequest()` 处理。
+
+- `toAndroidAssetUrl()` — 新增 `resource://rawfile/` → `file://` 转换分支
+- `resolveRawfileUrl()` — 新增方法，在 `files/hap/*/resources/rawfile/` 下扫描匹配文件
+- 新增 `import java.io.File`，新增常量 `RESOURCE_RAWFILE_PREFIX`
+
+已修复 HAP: Legado（`com.legadoTeam.app`）
+
 ---
 
 ## 4. foundation/arkui/napi（NAPI 模块加载）
@@ -195,6 +209,62 @@ Chrome WebView 118+ 在导航层直接拦截 `file://` URL，不调用 `shouldIn
 1. 当 `is_arkui_x=true` 时清空 `external_deps`（ArkUI-X 不走 OHOS bundles 依赖系统）
 2. 移除 `arm64e` 双架构编译、PAC 分支保护（Android NDK clang 无对应插件）
 3. 移除 test/notice 构建流程（Android 构建不需要）
+
+---
+
+## 6. plugins（ArkUI-X 插件库）
+
+### 新增 (hoa-weekly)
+
+#### 6.1 HMS HDS Base Component Stub（`plugins/hms/hds/`）— 2026-05-22
+
+Dashboard HAP (`top.rayawa.dashboard`) 导入 `@hms:hds.hdsBaseComponent`，ArkUI-X 不支持 HMS 模块解析链路，导致 `SyntaxError`。
+
+HDS（Huawei Design System）是 HMS SDK 的 UI 组件库（`@kit.UIDesignKit`, API 18/5.1.0），提供 `HdsNavigation`、`HdsNavDestination` 等对标准 ArkUI 组件的设计规范包装。ArkUI-X 没有 HMS `system_kits_config.json` 配置、没有 `SetHmsModuleList` 注册、没有 HDS ABC 实现——整条链路不存在。
+
+**策略**: 创建 NAPI 模块 `hds.hdsBaseComponent`，将 HDS 包装组件 1:1 委托至标准 ArkUI 内置组件（`HdsNavigation` → global `Navigation`，`HdsNavDestination` → global `NavDestination`），Instance/Attribute 辅助类返回 `undefined` 桩函数，枚举（`ScrollEffectType`、`HdsNavigationTitleMode`）原样导出。
+
+基于编译器白名单（`third_party/typescript/src/compiler/ohApi.ts:1541-1555`）中的未发布组件名，额外预委托 `HdsTabs` → `Tabs`、`HdsListItemCard` → `ListItem`，以实现前向兼容。
+
+**组件委托状态**:
+
+| 导出 | 委托至 | 状态 |
+|------|--------|------|
+| `HdsNavigation` | global `Navigation` | 已实现 |
+| `HdsNavDestination` | global `NavDestination` | 已实现 |
+| `HdsTabs` | global `Tabs` | 预委托（编译器白名单） |
+| `HdsListItemCard` | global `ListItem` | 预委托（编译器白名单） |
+| `ScrollEffectType` | 枚举 `{ COMMON_BLUR: 0 }` | 已实现 |
+| `HdsNavigationTitleMode` | 枚举 `{ FREE: 0, FULL: 1, MINI: 2 }` | 已实现 |
+| Instance/Attribute 类 (8个) | `undefined` 桩函数 | 已实现 |
+
+**调用方 (HOA 项目)**: 在 `HoaApplication.kt` 的 `initArkUIX()` 中：
+
+```kotlin
+if (isHapProcess) {
+    System.loadLibrary("hms_hds")
+}
+```
+
+#### 6.2 `js_web_webview.cpp` — `LoadUrl()` 新增 `resource://rawfile/` 转换（2026-05-23）
+
+`NapiWebviewController::LoadUrl()`（程序化 `controller.loadUrl()` 路径）参照已有的 `PostUrl()` 逻辑，新增 `resource://rawfile/` 前缀检测，调用 `GetRawFileUrl()` 将 URL 转换为 `file://` 路径。
+
+此修复覆盖 ETS 代码中显式调用 `controller.loadUrl("resource://rawfile/...")` 的场景（声明式 `src` 属性路径的对应修复见 3.10）。
+
+#### 6.3 `js_web_webview.cpp` — `InitAppModule` 设置 HAP 路径
+
+通过 JNI 接收 Java `StageApplication` 传入的 HAP 模块路径，存储为静态变量 `appHapPath_`，供 `GetRawFileUrl()` 使用。
+
+---
+
+## 7. build_plugins（SDK 构建描述）
+
+### 新增 (hoa-weekly)
+
+#### 7.1 `arkui_cross_sdk_description_std.json` — 新增 libhms_hds.so
+
+在 SDK 描述文件中新增 `libhms_hds.so` 插件条目，使构建系统在打包时将 HDS stub 库包含到产物中。
 
 ---
 
@@ -248,6 +318,20 @@ override fun onCreate() {
 | `StageActivity.java` | setInstanceName 拼接逻辑 |
 | `StageApplicationDelegate.java` | STUB_COPY_BUFFER_SIZE 常量 |
 | `AceWeb.java` | WebView HAP 资源加载 shouldInterceptRequest 拦截 |
+| `AceWebPluginAosp.java` | Web 组件 src 属性 resource://rawfile/ URL 解析 |
+
+### plugins
+| 文件 | 变更 |
+|------|------|
+| `hms/hds/BUILD.gn` | HDS stub 插件构建定义 |
+| `hms/hds/hds_base_component_stub.cpp` | HDS 组件委托 + 枚举导出 |
+| `plugin_lib.gni` | common_plugin_libs 新增 `"hms/hds"` |
+| `web/webview/js_web_webview.cpp` | LoadUrl() 新增 resource://rawfile 转换 |
+
+### build_plugins
+| 文件 | 变更 |
+|------|------|
+| `sdk/arkui_cross_sdk_description_std.json` | 新增 libhms_hds.so 描述 |
 
 ---
 
