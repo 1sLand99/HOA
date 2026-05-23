@@ -43,6 +43,16 @@ class HoaApplication : StageApplication() {
             initError = e
         }
 
+        // Pre-load HDS (Huawei Design System) stub so its NAPI module
+        // "hds.hdsBaseComponent" is registered before any HAP tries to
+        // import "@hms:hds.hdsBaseComponent".
+        try {
+            System.loadLibrary("hms_hds")
+            Log.e(TAG, "System.loadLibrary(\"hms_hds\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "System.loadLibrary(\"hms_hds\") — FAILED", e)
+        }
+
         try {
             super.onCreate()
             initSuccess = true
