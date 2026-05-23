@@ -213,6 +213,20 @@ if ! $SO_ONLY && ! $RES_ONLY; then
     else
         warn "systemres .abc 源目录不存在: $SRC_ABC_DIR"
     fi
+
+    # B1.2: 框架核心 .abc — arkComponent.abc 和 jsEnumStyle.abc 在 ace_engine
+    # 的 jsi 子模块中生成 (obj/ 目录), 不会输出到 ace_engine_cross/。
+    # 这些文件负责注册 ThemeColorMode、NavPathStack 等内置 ETS 全局类型，
+    # 缺少它们会导致 HAP 页面白屏。
+    log "--- B1.2: 框架核心 .abc (arkComponent / jsEnumStyle) ---"
+    SRC_FRAMEWORK_ABC_DIR="$ARKUI_BUILD/obj/foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/jsi"
+    for fw_abc in arkComponent.abc jsEnumStyle.abc; do
+        if [ -f "$SRC_FRAMEWORK_ABC_DIR/$fw_abc" ]; then
+            copy_file "$SRC_FRAMEWORK_ABC_DIR/$fw_abc" "$SYSRES_ABC_DIR/$fw_abc"
+        else
+            warn "框架核心 .abc 不存在: $SRC_FRAMEWORK_ABC_DIR/$fw_abc"
+        fi
+    done
 fi
 
 # ============================================================
