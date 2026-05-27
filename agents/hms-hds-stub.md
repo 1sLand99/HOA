@@ -182,21 +182,52 @@ ArkUI-X 上 `Button.createWithChild` 不可靠（`ButtonType` 枚举缺失、`ju
 
 # 组件委托策略
 
-| HDS 导出 | 委托至 | 策略 |
-|----------|--------|------|
-| `HdsActionBar` | ViewV2 组合（Row + SymbolGlyph/Image） | 组合实现 |
-| `ActionBarButton` | `@ObservedV2` class（每字段 `@Trace`） | 数据容器 |
-| `ActionBarStyle` | `@ObservedV2` class（每字段 `@Trace`） | 数据容器 |
-| `PrefixImage` | global `Image` | 1:1 委托 |
-| `SuffixButton` | global `Button` | 1:1 委托 |
-| `SuffixArrowIconText` | global `Row` | 1:1 委托 |
-| `HdsNavigation` | global `Navigation` | 1:1 委托 |
-| `HdsNavDestination` | global `NavDestination` | 1:1 委托 |
-| `HdsTabs` | global `Tabs` | 1:1 委托 |
-| `HdsListItemCard` | global `ListItem` | 1:1 委托 |
-| `HdsListItem` | global `ListItem` | 1:1 委托 |
+| HDS 导出 | 策略 | 说明 |
+|----------|------|------|
+| `HdsActionBar` | ViewV2 组合 | Row + SymbolGlyph/Image 模拟 |
+| `ActionBarButton` | `@ObservedV2` + `@Trace` | V2 数据类，所有字段 `@Trace` |
+| `ActionBarStyle` | `@ObservedV2` + `@Trace` | V2 数据类，所有字段 `@Trace` |
+| `HdsNavigation` → `Navigation` | 1:1 委托 | ArkUI 全局类 |
+| `HdsNavDestination` → `NavDestination` | 1:1 委托 | ArkUI 全局类 |
+| `HdsTabs` → `Tabs` | 1:1 委托 | ArkUI 全局类 |
+| `HdsListItemCard` → `ListItem` | 1:1 委托 | ArkUI 全局类 |
+| `HdsListItem` → `ListItem` | 1:1 委托 | ArkUI 全局类 |
+| `HdsTabsController` | `class extends TabsController` | 继承 + 5 个 stub 方法 |
+| `HdsSnackBar` | class（no-op stub） | 构造器 + `show`/`dismiss` 空实现 |
+| Prefix/Suffix 类（~24 个） | `class extends PrefixItem/SuffixItem` | 数据容器，`this.options = options` |
+| Modifier 类 | `class extends XxxAttribute` | `applyNormalAttribute` 空实现 |
+| `hdsMaterial` namespace | `export const` 对象 | MaterialType/MaterialLevel 枚举 + `getSystemMaterialTypes()` |
 
-其余导出：4 个枚举（`ScrollEffectType`、`HdsNavigationTitleMode`、`DividerMode`、`HdsNavDestinationTitleMode`）、8 个 stub 函数（Instance/Attribute 占位）、1 个 `HdsTabsController` stub。
+## 枚举（18 个，全部与 SDK 声明一致）
+
+| 枚举 | 值 |
+|------|----|
+| `ScrollEffectType` | `COMMON_BLUR=0`, `GRADUAL_BLUR=1`, `GRADIENT_BLUR=2`, `IMMERSIVE_GRADIENT_BLUR=3` |
+| `HdsNavigationTitleMode` | `FREE=0`, `FULL=1`, `MINI=2`, `MODAL=3` |
+| `HdsNavDestinationTitleMode` | `MINI=100`, `MODAL=101` |
+| `DividerMode` | `VISIBLE=0`, `NONE=1`, `FOLLOW_SCROLL=2` |
+| `DividerShowType` | `OFF=0`, `ON=1`, `AUTO=2` |
+| `TextStyleMode` | `NORMAL=200`, `SINGLE_CHARACTER=201` |
+| `BottomBuilderShowType` | `DIRECTLY_SHOW=0`, `OVERDRAG_SHOW=1` |
+| `HideMode` | `SCROLL_UP_TO=0`, `SCROLL_UP=1`, `SCROLL_DOWN=2`, `SCROLL_UP_TO_BLEND_SCROLL_UP=3` |
+| `IconStyleMode` | `SMALL=100`, `NORMAL=101`, `LARGE=102` |
+| `BlurStrategy` | `ENABLE=0`, `DISABLE=1`, `ADAPTIVE=2` |
+| `TitleSize` | `TITLE_S=0`, `TITLE_ML=1` |
+| `IconSize` | `SMALL_ICON=1`, `SYSTEM_ICON=2` |
+| `HdsBarStyle` | `COLLAPSE=0`, `EXPAND=1` |
+| `HdsTabsBarChangeMode` | `NORMAL=0`, `USER_CLICK=1`, `APP_TRIGGER=2` |
+| `HdsAnimationMode` | `SCROLL_ANIMATION=0`, `CLICK_ANIMATION=1` |
+| `ExtendBarMode` | `HALF_SCREEN_FIXED=100` |
+| `SnackBarOperationType` | `TEXT_ONLY=0` .. `HIGHLIGHT_TEXT_WITH_CLOSE=4` |
+| `SnackBarIconType` | `SMALL=0`, `NORMAL=1` |
+
+## Prefix 类（7 个）
+
+`PrefixItem`（空基类）→ `PrefixImage`, `PrefixIcon`, `PrefixBadge`, `PrefixSwitch`, `PrefixToggleButton`, `PrefixButton`, `PrefixCustomBuilder`
+
+## Suffix 类（17 个）
+
+`SuffixItem`（空基类）→ `SuffixText`, `SuffixImage`, `SuffixLoadingProgress`, `SuffixRadio`, `SuffixCheckbox`, `SuffixSwitch`, `SuffixArrow`, `SuffixBadge`, `SuffixButton`, `SuffixIcon`, `SuffixSubIcon`, `SuffixSelect`, `SuffixToggleButton`, `SuffixBadgeAndArrow`, `SuffixTextAndArrow`, `SuffixArrowIconText`, `SuffixCustomBuilder`
 
 ---
 

@@ -29,7 +29,7 @@
 | MainActivity HAP 管理 | ✅ | 安装 / 预览 / 列表 / 启动 / 详情 / 卸载 功能完整 |
 | @ohos NAPI 模块全量加载 | ✅ | plugins/*/ 全部 .so 随 APK 分发 |
 | OHOS → Android 权限映射 | ✅ | INTERNET 等普通权限绕过 JNI 直接授予，危险权限走运行时流程 |
-| HMS HDS 组件 mock | ✅ | 嵌入式 ABC（ViewPU 组合实现）+ module_resolver 重定向，覆盖 ES import 和 HSP record 双路径 |
+| HMS HDS 组件 mock | ✅ | 嵌入式 ABC（ViewV2 组合实现）+ module_resolver 重定向，覆盖 ES import 和 HSP record 双路径；30+ 导出（18 枚举、24 Prefix/Suffix 类、HdsSnackBar、hdsMaterial 等）|
 | .hap 文件关联 | ✅ | intent filter 注册，文件管理器/分享均可直接安装 |
 | 最近任务列表显示 HAP 名称和图标 | ✅ | `setTaskDescription()` 动态设置 |
 | 多进程槽位管理 | ✅ | 5 个独立进程，互不干扰 |
@@ -143,19 +143,35 @@ Chrome WebView 118+ 在导航层直接拦截 `file://` URL，`shouldInterceptReq
 
 2. **ABC record 路径**（`com.huawei.hmos.hdscomponent/HdsComponent/ets/pages/...`）：在 `module_resolver.cpp:ReplaceModuleThroughFeature()` 中将 HSP record 引用统一重定向到 `@hms:hds.hdsBaseComponent`，由上述 mock 处理。
 
-**技术实现**：
-- JS mock 源码（`plugins/hms/hds/src/hds_component_mock.js`）提供：HdsActionBar ViewPU 组件（Row + Button + Image 组合渲染）、ActionBarButton/ActionBarStyle 数据类、组件委托（Navigation/NavDestination/Tabs/ListItem）、枚举、stub 函数
-- 三步 ABC 构建流水线：`es2abc --module` → `llvm-objcopy` 嵌入 → `ohos_source_set` 链接进 `libhms_hds.so`
-- `export default { ... }` 是关键——缺失会导致 `GetExportObjectFromBuffer("default")` 查找失败
-
 改了 2 个仓库：`plugins`（3 文件 +333/-96）、`arkcompiler/ets_runtime`（1 文件 +10）。
+
+### 10. HDS Stub 全面扩展（2026-05-27）
+
+基于 SDK 声明文件和编译器白名单，将 HDS stub 从 ~20 个导出扩展到 70+，覆盖所有已声明的 HDS 组件和类型：
+
+**从 ViewPU 迁移到 ViewV2**：`HdsActionBar` 最初继承 `ViewPU`，`isPrimaryIconChanged` 响应式更新失效。根因是 SDK 声明为 `@ComponentV2`，父组件使用 V2 专属的 `@Local` + `ObserveV2` 追踪。改为继承 `ViewV2`，用 `@Param`/`initParam`/`updateParam`/`resetParam` 替代 V1 的 `SynchedProperty` 体系。参考 `advanced_ui_component/arcbutton/interfaces/arcbutton.js`（手写 ViewV2 的完整实现）。
+
+**闭包变量捕获修复**：`observeComponentCreation2` 回调中的值必须在回调**内部**读取 `this.xxx`，不能用外部局部变量捕获。V2 的 `updateDirtyElements()` 重执行回调时，回调内的 `this` 读取被 ObserveV2 追踪，但闭包中的局部变量已在 `initialRender()` 执行时固化。
+
+**新增导出（50+）**：
+- 18 个枚举（值严格匹配 SDK 声明）
+- 7 个 Prefix 类、17 个 Suffix 类（数据容器，`this.options = options`）
+- `HdsTabsController extends TabsController`（5 个 stub 方法）
+- `HdsSnackBar`（no-op stub）
+- 4 个 Modifier 类（`applyNormalAttribute` 空实现）
+- `hdsMaterial` namespace（枚举 + `getSystemMaterialTypes()`）
+- `SymbolGlyph.create()` 处理 type 40000 资源
+
+**构建修复**：ninja 构建因 GN 状态过期出现 "multiple rules generate" 错误，运行 `build.sh` 完整重新生成 ninja 文件后解决。`llvm-objcopy` 命令格式：`-I binary -B aarch64 -O elf64-littleaarch64`。
+
+改了 1 个文件（`hds_component_mock.js`），+421/-62 行。详细技术文档见 `agents/hms-hds-stub.md`。
 
 ### HDS 组件兼容方案
 
 **hw_base_calendar 部分渲染**：pages/Index 导入 `HdsNavigation`、`HdsActionBar` from `@hms:hds.hdsBaseComponent`。通过嵌入式 ABC mock + module_resolver 重定向两步方案实现兼容：
 
 1. `ReplaceModuleThroughFeature` 将 `com.huawei.hmos.hdscomponent/...` HSP record 引用统一重定向到 `@hms:hds.hdsBaseComponent`
-2. NAPI stub（ABC-only 模式）提供 ViewPU 组合实现的 HdsActionBar 及所有 HDS 导出
+2. NAPI stub（ABC-only 模式）提供 ViewV2 组合实现的 HdsActionBar（Row + SymbolGlyph/Image + borderRadius 圆形按钮）及 70+ HDS 导出
 
 **已知视觉差异**：HdsActionBar mock 使用简化的 Row + Button + Image 组合，缺少 innerSpace 间距控制、isHorizontal 垂直布局、shadowStyle/backgroundBlurStyle 视觉效果。功能正确但外观与 HMS 原版差异较大。
 
@@ -182,7 +198,7 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 
 ### 短期
 
-- HdsActionBar mock 视觉完善（innerSpace 按钮间距、isHorizontal 垂直布局、shadowStyle/backgroundBlurStyle）
+- HdsActionBar mock 视觉完善（innerSpace 按钮间距、isHorizontal 垂直布局、shadowStyle/backgroundBlurStyle）—— 结构已就绪（ViewV2），需补充视觉属性
 - Vulkan RenderContext 创建失败时明确回退到 OpenGL ES
 - `@ohos.pulltorefresh` 第三方 ohpm 包支持（wan-harmony 多个页面依赖）
 - `@ohos.promptAction` 插件补齐
@@ -211,6 +227,8 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 |------|------|
 | `agents/PLAN.md` | 完整技术方案、阻塞点分析、替代方案 |
 | `agents/PROGRESS.md` | 本文件，项目进展总览 |
+| `agents/hms-hds-stub.md` | HDS Stub 实现方案、ViewV2 模式、构建流水线、组件委托策略 |
+| `agents/ets-to-js.md` | ETS → JS transpiler 模式参考，ViewPU/V1 组件写法 |
 | `docs/BUILD.md` | 构建文档、sync 脚本用法、产物清单 |
 | `docs/ARKUI-X_PATCHES.md` | ArkUI-X 6.1-Release 源码修改详细说明 |
 | `scripts/setup_arkui_x.sh` | ArkUI-X 源码初始化（hoa-6.1 分支） |
