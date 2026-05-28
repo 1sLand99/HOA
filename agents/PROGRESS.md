@@ -229,6 +229,9 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 | `agents/PROGRESS.md` | 本文件，项目进展总览 |
 | `agents/hms-hds-stub.md` | HDS Stub 实现方案、ViewV2 模式、构建流水线、组件委托策略 |
 | `agents/ets-to-js.md` | ETS → JS transpiler 模式参考，ViewPU/V1 组件写法 |
+| `agents/native-support.md` | Native .so 兼容 v0 概念（全量 musl 沙箱架构） |
+| `agents/native-so-compat.md` | Native .so 兼容详细方案（方案 C：修改 __pthread_self 支持 bionic TLS） |
+| `agents/native-so-compat-analysis.md` | Native .so 兼容方案交叉验证（bionic/musl 源码对照，发现 3 个设计缺陷及修复） |
 | `docs/BUILD.md` | 构建文档、sync 脚本用法、产物清单 |
 | `docs/ARKUI-X_PATCHES.md` | ArkUI-X 6.1-Release 源码修改详细说明 |
 | `scripts/setup_arkui_x.sh` | ArkUI-X 源码初始化（hoa-6.1 分支） |
