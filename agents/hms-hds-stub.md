@@ -35,7 +35,20 @@ hds_component_mock.js  →  es2abc --module  →  hds_mock.abc  →  llvm-objcop
 2. `gen_js_obj("hds_abc")` — ABC → .o（Android，`llvm-objcopy -I binary`）
 3. `ohos_source_set("hms_hds_static")` — 链接 C++ stub + .o → .so
 
-C++ 注册（`hds_base_component_stub.cpp`）使用 `napi_module_with_js` 结构的 ABC-only 模式（`nm_register_func = nullptr`），通过 `nm_get_abc_code` 回调提供嵌入式 ABC。注册双模块名：`hds.hdsBaseComponent` 和 `UIDesignKit`。
+C++ 注册（`hds_base_component_stub.cpp`）使用 `napi_module_with_js` 结构的 ABC-only 模式（`nm_register_func = nullptr`），通过 `nm_get_abc_code` 回调提供嵌入式 ABC。注册 8 个模块名：
+
+| 模块名 | HAP import 来源 | 说明 |
+|--------|---------------|------|
+| `hds.hdsBaseComponent` | `@hms:hds.hdsBaseComponent` | 主 mock，提供所有导出 |
+| `UIDesignKit` | `@kit.UIDesignKit` | 与 hdsBaseComponent 相同 ABC |
+| `hds.hdsMaterial` | `@hms:hds.hdsMaterial` | MaterialType/MaterialLevel 枚举 + getSystemMaterialTypes() |
+| `hds.hds.HdsSnackBar` | `@hms.hds.HdsSnackBar` | HdsSnackBar 类 + 枚举 |
+| `hds.hds.HdsActionBar` | `@hms.hds.HdsActionBar` | HdsActionBar + ActionBarButton + ActionBarStyle |
+| `hds.hds.HdsSideBar` | `@hms.hds.HdsSideBar` | HdsSideBar 结构体 |
+| `hds.hds.symbolRegister` | `@hms.hds.symbolRegister` | registerSymbol() 函数 |
+| `hds.hds.HdsStyle` | `@hms.hds.HdsStyle` | HdsListItem + 枚举 + bleedIconStyle |
+
+新增子模块使用 `HDS_SUB_MODULE` 宏批量注册，一行定义一个模块，复用同一 ABC：
 
 ---
 
@@ -197,8 +210,10 @@ ArkUI-X 上 `Button.createWithChild` 不可靠（`ButtonType` 枚举缺失、`ju
 | Prefix/Suffix 类（~24 个） | `class extends PrefixItem/SuffixItem` | 数据容器，`this.options = options` |
 | Modifier 类 | `class extends XxxAttribute` | `applyNormalAttribute` 空实现 |
 | `hdsMaterial` namespace | `export const` 对象 | MaterialType/MaterialLevel 枚举 + `getSystemMaterialTypes()` |
+| `symbolRegister` namespace | `export const` 对象 | `registerSymbol(ttfSrc, jsonSrc)` 返回 `false` |
+| `bleedIconStyle` 函数 | `export function` | 空实现 |
 
-## 枚举（18 个，全部与 SDK 声明一致）
+## 枚举（19 个，全部与 SDK 声明一致）
 
 | 枚举 | 值 |
 |------|----|
@@ -220,6 +235,7 @@ ArkUI-X 上 `Button.createWithChild` 不可靠（`ButtonType` 枚举缺失、`ju
 | `ExtendBarMode` | `HALF_SCREEN_FIXED=100` |
 | `SnackBarOperationType` | `TEXT_ONLY=0` .. `HIGHLIGHT_TEXT_WITH_CLOSE=4` |
 | `SnackBarIconType` | `SMALL=0`, `NORMAL=1` |
+| `SwipeDeleteTriggerType` | `NORMAL_TRIGGER=0`, `EASY_TRIGGER=1`, `NO_TRIGGER=2` |
 
 ## Prefix 类（7 个）
 
@@ -253,7 +269,7 @@ if (requestName.find("com.huawei.hmos.hdscomponent") != CString::npos) {
 
 HDS 组件名来自两个独立来源：
 
-**来源 A**：HMS SDK 声明文件（`/apps/harmony/sdk/default/hms/ets/api/@hms.hds.*.d.ets`）— 运行时真实存在的组件：
+**来源 A**：HMS SDK 声明文件 — 运行时真实存在的组件：
 - `HdsNavigation`、`HdsNavDestination`、`HdsActionBar`、`ActionBarButton`、`ActionBarStyle`
 
 **来源 B**：ArkUI-X TypeScript 编译器白名单（`third_party/typescript/src/compiler/ohApi.ts`）— 编译时接受但 SDK 未发布的组件：
@@ -268,7 +284,7 @@ stub 为来源 B 提供了 1:1 委托（`HdsTabs` → `Tabs`、`HdsListItemCard`
 | 文件 | 作用 |
 |------|------|
 | `plugins/hms/hds/src/hds_component_mock.js` | JS mock 源码（ViewV2 + 所有导出） |
-| `plugins/hms/hds/hds_base_component_stub.cpp` | C++ 注册（ABC-only，双模块名） |
+| `plugins/hms/hds/hds_base_component_stub.cpp` | C++ 注册（ABC-only，8 模块） |
 | `plugins/hms/hds/BUILD.gn` | 三步构建流水线 |
 | `advanced_ui_component/arcbutton/interfaces/arcbutton.js` | **ViewV2 手写 JS 参考**（最重要的参考代码） |
 | `agents/ets-to-js.md` | ETS → JS transpiler 模式参考 |
@@ -276,5 +292,10 @@ stub 为来源 B 提供了 1:1 委托（`HdsTabs` → `Tabs`、`HdsListItemCard`
 | `arkcompiler/ets_runtime/ecmascript/base/path_helper.h:86` | `GetStrippedModuleName` — 前缀去除 |
 | `foundation/arkui/ace_engine/build/ace_gen_obj.gni` | `gen_js_obj` / `gen_obj` GN 模板 |
 | `build/config/components/ets_frontend/es2abc_config.gni` | `es2abc_gen_abc` GN 模板 |
-| `/apps/harmony/sdk/default/hms/ets/api/@hms.hds.HdsActionBar.d.ets` | HdsActionBar SDK 声明 |
-| `/apps/harmony/sdk/default/hms/ets/api/@hms.hds.hdsBaseComponent.d.ets` | HDS 基础组件 SDK 声明 |
+| SDK: `@hms.hds.hdsBaseComponent` | HDS 基础组件声明 |
+| SDK: `@hms.hds.hdsMaterial` | hdsMaterial 声明 |
+| SDK: `@hms.hds.HdsActionBar` | HdsActionBar 声明 |
+| SDK: `@hms.hds.HdsSnackBar` | HdsSnackBar 声明 |
+| SDK: `@hms.hds.HdsSideBar` | HdsSideBar 声明 |
+| SDK: `@hms.hds.HdsStyle` | HdsStyle 声明 |
+| SDK: `@hms.hds.symbolRegister` | symbolRegister 声明 |
