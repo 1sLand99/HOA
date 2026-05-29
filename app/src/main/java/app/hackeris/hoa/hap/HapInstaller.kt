@@ -95,8 +95,12 @@ class HapInstaller(private val context: Context) {
             }
         }
 
+        // Detect if HAP has native .so files
+        val hasNativeLibs = File(targetDir, "libs").isDirectory &&
+            File(targetDir, "libs").walkTopDown().any { it.isFile && it.extension == "so" }
+
         // Write pkgContextInfo.json (required by StageAssetProvider.GetPkgJsonBuffer)
-        writePkgContextInfo(targetDir, fullModuleName, bundle.moduleConfig.type)
+        writePkgContextInfo(targetDir, fullModuleName, bundle.moduleConfig.type, hasNativeLibs)
 
         val mainAbility = bundle.moduleConfig.mainElement.ifBlank {
             bundle.moduleConfig.abilities.firstOrNull()?.name ?: ""
@@ -111,7 +115,7 @@ class HapInstaller(private val context: Context) {
         )
     }
 
-    private fun writePkgContextInfo(targetDir: File, fullModuleName: String, moduleType: String) {
+    private fun writePkgContextInfo(targetDir: File, fullModuleName: String, moduleType: String, hasNativeLibs: Boolean) {
         // OHOS-format pkgContextInfo.json expected by js_runtime.cpp::ParsePkgContextInfoJson.
         // Top-level key = module short name, value = {packageName, bundleName, moduleName, version, entryPath, isSO, dependencyAlias}
         val lastDot = fullModuleName.lastIndexOf('.')
@@ -124,7 +128,7 @@ class HapInstaller(private val context: Context) {
                 put("moduleName", fullModuleName)
                 put("version", "")
                 put("entryPath", "src/main/")
-                put("isSO", false)
+                put("isSO", hasNativeLibs)
                 put("dependencyAlias", "")
             })
         }

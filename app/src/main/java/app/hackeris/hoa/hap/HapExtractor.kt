@@ -25,11 +25,11 @@ object HapExtractor {
             val tempHap = File(context.cacheDir, "temp_${moduleName}.hap")
             tempHap.outputStream().use { out -> hapInputStream.copyTo(out) }
 
-            val extracted = extractHap(tempHap, targetDir)
+            val (extracted, hasNativeLibs) = extractHap(tempHap, targetDir)
             tempHap.delete()
 
             if (extracted) {
-                generatePkgContextInfo(targetDir, fullName)
+                generatePkgContextInfo(targetDir, fullName, hasNativeLibs)
                 Log.e(TAG, "HAP extracted to $targetDir")
                 listExtractedFiles(targetDir)
             }
@@ -40,14 +40,19 @@ object HapExtractor {
         }
     }
 
-    private fun extractHap(hapFile: File, targetDir: File): Boolean {
+    private fun extractHap(hapFile: File, targetDir: File): Pair<Boolean, Boolean> {
         val zipFile = ZipFile(hapFile)
         val entries = zipFile.entries()
 
         var count = 0
+        var hasNativeLibs = false
         while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
             if (entry.isDirectory) continue
+
+            if (!hasNativeLibs && entry.name.startsWith("libs/") && entry.name.endsWith(".so")) {
+                hasNativeLibs = true
+            }
 
             val outFile = File(targetDir, entry.name)
             outFile.parentFile?.mkdirs()
@@ -61,8 +66,8 @@ object HapExtractor {
         }
         zipFile.close()
 
-        Log.e(TAG, "Extracted $count files from HAP to $targetDir")
-        return count > 0
+        Log.e(TAG, "Extracted $count files from HAP to $targetDir, hasNativeLibs=$hasNativeLibs")
+        return Pair(count > 0, hasNativeLibs)
     }
 
     private fun listExtractedFiles(dir: File) {
@@ -74,7 +79,7 @@ object HapExtractor {
         }
     }
 
-    private fun generatePkgContextInfo(targetDir: File, fullName: String) {
+    private fun generatePkgContextInfo(targetDir: File, fullName: String, hasNativeLibs: Boolean) {
         val pkgFile = File(targetDir, "pkgContextInfo.json")
         if (pkgFile.exists()) return
         // OHOS-format pkgContextInfo.json expected by js_runtime.cpp::ParsePkgContextInfoJson.
@@ -82,7 +87,7 @@ object HapExtractor {
         val lastDot = fullName.lastIndexOf('.')
         val shortName = if (lastDot >= 0) fullName.substring(lastDot + 1) else fullName
         val bundleName = if (lastDot >= 0) fullName.substring(0, lastDot) else ""
-        val json = """{"$shortName":{"packageName":"$shortName","bundleName":"$bundleName","moduleName":"$fullName","version":"","entryPath":"src/main/","isSO":false,"dependencyAlias":""}}"""
+        val json = """{"$shortName":{"packageName":"$shortName","bundleName":"$bundleName","moduleName":"$fullName","version":"","entryPath":"src/main/","isSO":$hasNativeLibs,"dependencyAlias":""}}"""
         pkgFile.writeText(json)
         Log.e(TAG, "Generated pkgContextInfo.json: $json")
     }

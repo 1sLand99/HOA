@@ -185,6 +185,7 @@ open class HoaAbilityActivity : StageActivity() {
         return false
     }
 
+
     companion object {
         private const val TAG = "HOA.Ability"
     }
