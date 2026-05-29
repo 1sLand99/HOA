@@ -11,8 +11,12 @@ android {
         applicationId = "app.hackeris.hoa"
         minSdk = 26
         targetSdk = 33
-        versionCode = 100001
-        versionName = "1.0.1"
+        // 版本号编制规则:
+        //   versionName = YY.M.D.B  (年.月.日.当日构建次数)
+        //   versionCode = YYMMDDBB  (年年月月日日次次，共 9 位)
+        // 示例: 26.5.29.1 → 260529001 (2026-05-29 第 1 次构建)
+        versionCode = 260529001
+        versionName = "26.5.29.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
