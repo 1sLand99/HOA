@@ -8,6 +8,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import app.hackeris.hoa.hap.HapExtractor
+import app.hackeris.hoa.hap.HapInstaller
 import java.io.File
 
 class DevTestActivity : AppCompatActivity() {
@@ -21,6 +22,8 @@ class DevTestActivity : AppCompatActivity() {
     private val targetModule by lazy { intent.getStringExtra("targetModule") }
     private val targetAbility by lazy { intent.getStringExtra("targetAbility") }
     private val autoLaunch by lazy { intent.getBooleanExtra("autoLaunch", false) }
+    // Path to a HAP file on device to install before launching.
+    private val installHapPath by lazy { intent.getStringExtra("installHapPath") }
 
     // --- Default (hardcoded) test HAP ---
     private val defaultBundle = "app.hackeris.harmonyexample"
@@ -42,9 +45,12 @@ class DevTestActivity : AppCompatActivity() {
         if (autoLaunch) {
             extractButton.isEnabled = false
             extractButton.text = getString(R.string.btn_auto_mode)
-            Log.e(TAG, "Auto-launch mode bundle=$bundleName module=$moduleName ability=$abilityName")
+            Log.e(TAG, "Auto-launch mode bundle=$bundleName module=$moduleName ability=$abilityName installHapPath=$installHapPath")
 
-            if (targetBundle != null) {
+            if (installHapPath != null) {
+                // Install HAP from device path, then launch.
+                installAndLaunch()
+            } else if (targetBundle != null) {
                 // External target — HAP is already installed via MainActivity.
                 // No extraction needed.
                 launchHap()
@@ -98,6 +104,34 @@ class DevTestActivity : AppCompatActivity() {
         }.start()
     }
 
+    private fun installAndLaunch() {
+        val path = installHapPath ?: return
+        Thread {
+            try {
+                val hapFile = File(path)
+                if (!hapFile.exists()) {
+                    runOnUiThread {
+                        Toast.makeText(this, "HAP file not found: $path", Toast.LENGTH_LONG).show()
+                    }
+                    return@Thread
+                }
+                Log.e(TAG, "Installing HAP from $path ...")
+                val installed = HapInstaller(this).install(hapFile.absolutePath)
+                Log.e(TAG, "Installed OK: bundle=${installed.bundleName} module=${installed.moduleName} ability=${installed.mainAbility}")
+                runOnUiThread {
+                    refreshStatus()
+                    Toast.makeText(this, "Installed ${installed.bundleName}/${installed.mainAbility}", Toast.LENGTH_SHORT).show()
+                    launchHap(installed.bundleName, installed.moduleName, installed.mainAbility)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Install failed", e)
+                runOnUiThread {
+                    Toast.makeText(this, "Install failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
     private fun extractAndLaunch() {
         Thread {
             try {
@@ -135,11 +169,15 @@ class DevTestActivity : AppCompatActivity() {
     }
 
     private fun launchHap() {
+        launchHap(bundleName, moduleName, abilityName)
+    }
+
+    private fun launchHap(bundle: String, module: String, ability: String) {
         // Validate target module exists on disk.
-        val fullName = "$bundleName.$moduleName"
+        val fullName = "$bundle.$module"
         val moduleDir = File(filesDir, "hap/$fullName")
         if (!moduleDir.isDirectory || moduleDir.listFiles()?.isEmpty() == true) {
-            Toast.makeText(this, getString(R.string.toast_module_not_found, bundleName, moduleName), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.toast_module_not_found, bundle, module), Toast.LENGTH_LONG).show()
             Log.e(TAG, "Target module not found: $fullName")
             return
         }
@@ -150,12 +188,12 @@ class DevTestActivity : AppCompatActivity() {
             Log.w(TAG, "All process slots occupied")
             return
         }
-        Log.e(TAG, "Launching HAP slot=$slot bundle=$bundleName/$moduleName/$abilityName")
+        Log.e(TAG, "Launching HAP slot=$slot bundle=$bundle/$module/$ability")
         val intent = Intent().apply {
             setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
-            putExtra("BUNDLE_NAME", bundleName)
-            putExtra("MODULE_NAME", moduleName)
-            putExtra("ABILITY_NAME", abilityName)
+            putExtra("BUNDLE_NAME", bundle)
+            putExtra("MODULE_NAME", module)
+            putExtra("ABILITY_NAME", ability)
             putExtra("PROCESS_SLOT", slot)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }

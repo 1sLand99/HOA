@@ -25,6 +25,8 @@ app/src/main/assets/hap/
 app/libs/*.jar
 app/libs/*.aar
 *.so
+*.o
+app/src/main/cpp/obj/
 
 third_party/build_android
 third_party/build_gen

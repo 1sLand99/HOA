@@ -1,6 +1,7 @@
 package app.hackeris.hoa.hap
 
 import android.content.Context
+import android.util.Log
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
@@ -95,6 +96,23 @@ class HapInstaller(private val context: Context) {
             }
         }
 
+        // Patch extracted .so files: replace DT_NEEDED "libc.so" with
+        // "libb.so" in-place so the musl ABI bridge resolves first.
+        val libsDir = File(targetDir, "libs")
+        if (libsDir.isDirectory) {
+            libsDir.walkTopDown()
+                .filter { it.isFile && it.extension == "so" }
+                .forEach { soFile ->
+                    try {
+                        if (!ElfPatcher.patchSo(soFile.absolutePath)) {
+                            Log.w(TAG, "ELF patch skipped or failed: ${soFile.name}")
+                        }
+                    } catch (e: UnsatisfiedLinkError) {
+                        Log.w(TAG, "ELF patch JNI not available, skipping: ${soFile.name}", e)
+                    }
+                }
+        }
+
         // Detect if HAP has native .so files
         val hasNativeLibs = File(targetDir, "libs").isDirectory &&
             File(targetDir, "libs").walkTopDown().any { it.isFile && it.extension == "so" }
@@ -170,6 +188,10 @@ class HapInstaller(private val context: Context) {
                     mainAbility = mainAbility
                 )
             } ?: emptyList()
+    }
+
+    companion object {
+        private const val TAG = "HOA.HapInstaller"
     }
 
     fun uninstall(bundleName: String) {

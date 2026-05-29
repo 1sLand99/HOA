@@ -1,26 +1,31 @@
 # HOA — Harmony on Android
 
-在 Android 设备上运行 OpenHarmony HAP 应用。
+在 Android 设备上运行 OpenHarmony HAP 应用。支持 ArkTS 页面渲染和 HAP 闭源 `.so` 原生模块。
 
 ## 原理
 
-HOA 基于 ArkUI-X weekly_20260518 的 Android 构建体系，通过 6 个仓库的定向适配使运行时能够加载并执行 OHOS 原生格式的 HAP，将 ArkTS 页面渲染到 Android SurfaceView 上。
+HOA 基于 ArkUI-X weekly_20260518 的 Android 构建体系，通过 7 个仓库的定向适配使运行时能够加载并执行 OHOS 原生格式的 HAP：
+
+- **ArkTS 渲染**：将 ArkTS 页面渲染到 Android SurfaceView
+- **原生 .so 支持**：通过 `libb.so`（musl ABI bridge）在 Android bionic 上运行 OHOS HAP 的闭源 `.so` 文件，ELF patch 自动替换 `libc.so` NEEDED 为 `libb.so`
 
 ```
 ┌─────────────────────────────────┐
 │  HAP (entry.hap)                │
 │  ├── module.json                │
 │  ├── ets/modules.abc            │  ← OHOS 原生字节码
+│  ├── libs/arm64-v8a/*.so        │  ← OHOS 闭源 .so（musl ABI）
 │  ├── resources.index            │
 │  └── resfile/                   │
 └──────────┬──────────────────────┘
-           │ HapInstaller 解压
+           │ HapInstaller 解压 + ELF patch (libc.so → libb.so)
            ▼
 ┌─────────────────────────────────┐
 │  HOA Application                │
 │  ├── StageApplication           │  ← ArkUI-X weekly_20260518 Android 适配器
 │  ├── libarkui_android.so        │  ← 内嵌 ETS VM + ACE 渲染引擎
-│  └── OHOS HAP Mode Patches      │  ← 6 仓库定向适配
+│  ├── libb.so (musl bridge)      │  ← musl ABI 桥接（pthread/stdio/dirent）
+│  └── OHOS HAP Mode Patches      │  ← 7 仓库定向适配
 └──────────┬──────────────────────┘
            │
            ▼
@@ -39,7 +44,10 @@ HOA 基于 ArkUI-X weekly_20260518 的 Android 构建体系，通过 6 个仓库
 构建概览：
 
 ```
-repo init (HOA manifest) → prebuilts_download.sh → build.sh → sync_arkui_x.sh → gradlew assembleDebug
+build_all.sh (ArkUI-X → libb.so → sync → APK)
+
+或分步：
+repo init (HOA manifest) → prebuilts_download.sh → build.sh → build_musl_bridge.sh → sync_arkui_x.sh → gradlew assembleDebug
 ```
 
 构建耗时数小时不等，视机器性能和网络状况而定。磁盘需求约 100GB（源码 + 产物）。
@@ -53,7 +61,7 @@ repo init (HOA manifest) → prebuilts_download.sh → build.sh → sync_arkui_x
 
 ## 当前状态
 
-ArkUI-X weekly_20260518 移植完成。5 个已安装 HAP 中 4 个正常渲染，WebView HAP 资源加载和 HAP 大文件安装 OOM 已修复，支持安装/预览/启动/卸载全流程。详见 `agents/PROGRESS.md`。
+ArkUI-X weekly_20260518 移植完成。原生 .so 支持（Phase 2）已实现：HAP 闭源 .so 通过 libb.so musl ABI bridge 在 Android 上运行，pthread/stdio/dirent 全链路通过验证。详见 `agents/PROGRESS.md`。
 
 ## 相关文档
 

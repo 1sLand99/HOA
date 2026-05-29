@@ -1,0 +1,87 @@
+/*
+ * libb.so — musl ABI bridge for OHOS HAP native .so files.
+ *
+ * Exports musl-compiled pthread/stdio/dirent/setjmp/malloc symbols.
+ * All internal musl symbols are hidden.
+ *
+ * SONAME: libb.so (exactly 8 bytes, hot-patches over "libc.so" in .dynstr)
+ */
+{
+    global:
+        /* pthread */
+        pthread_*;
+        thrd_*;
+        mtx_*;
+        cnd_*;
+        tss_*;
+        sem_*;
+
+        /* stdio */
+        printf; fprintf; sprintf; snprintf;
+        vfprintf; vsnprintf;
+        dprintf; vdprintf;
+        asprintf; vasprintf;
+        scanf; fscanf; sscanf;
+        vfscanf; vsscanf;
+        vprintf; vscanf;
+        vfwprintf; vfwscanf; vswprintf; vswscanf;
+        vwprintf; vwscanf;
+        wprintf; wscanf;
+        fwprintf; fwscanf;
+        swprintf; swscanf;
+        fopen; fclose; freopen;
+        fread; fwrite;
+        fgetc; fgets; getc; getchar;
+        fputc; fputs; putc; putchar; puts;
+        getw; putw;
+        getdelim; getline;
+        fseek; ftell; fgetpos; fsetpos; rewind;
+        fflush;
+        clearerr; feof; ferror; fileno;
+        setbuf; setbuffer; setlinebuf; setvbuf;
+        fwide;
+        flockfile; ftrylockfile; funlockfile;
+        getc_unlocked; getchar_unlocked;
+        putc_unlocked; putchar_unlocked;
+        getwc; getwchar; fgetwc; fgetws;
+        putwc; putwchar; fputwc; fputws;
+        ungetc; ungetwc;
+        perror;
+        remove; rename;
+        tmpfile; tmpnam; tempnam;
+        fmemopen; open_memstream; open_wmemstream;
+        fopencookie;
+        popen; pclose;
+        stdin; stdout; stderr;
+        __stdin_used; __stdout_used; __stderr_used;
+
+        /* dirent */
+        opendir; fdopendir; readdir; readdir_r;
+        closedir; dirfd; seekdir; telldir; rewinddir;
+        scandir; alphasort; versionsort;
+
+        /* setjmp */
+        setjmp; longjmp;
+        _setjmp; _longjmp;
+        __setjmp;
+
+        /* errno */
+        __errno_location;
+        ___errno_location;
+
+        /* malloc bridge entry points */
+        __libc_malloc_impl;
+        __libc_free;
+        __libc_realloc;
+        __libc_calloc;
+
+        /* bridge API */
+        __musl_bridge_self;
+        __musl_bridge_register;
+
+        /* JNI */
+        Java_app_hackeris_hoa_hap_ElfPatcher_patchSo;
+
+    local:
+        *;
+};

@@ -24,6 +24,15 @@ class HoaApplication : StageApplication() {
             initArkUIX()
         } else {
             Log.e(TAG, "Main process — skipping ArkUI-X init (not needed for launcher)")
+            // Load libb.so (musl ABI bridge) even in the main process.
+            // HapInstaller (which runs in the main process) needs the ELF
+            // patching JNI that lives in libb.so.
+            try {
+                System.loadLibrary("b")
+                Log.e(TAG, "System.loadLibrary(\"b\") — SUCCESS (main process)")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e(TAG, "System.loadLibrary(\"b\") — FAILED (main process)", e)
+            }
             initSuccess = true   // main process is always "ready"
         }
 
@@ -31,6 +40,16 @@ class HoaApplication : StageApplication() {
     }
 
     private fun initArkUIX() {
+        // Load musl ABI bridge (libb.so) FIRST — it must be in the linker
+        // namespace before any HAP .so files load, so musl symbols resolve
+        // through libb.so instead of bionic libc.so.
+        try {
+            System.loadLibrary("b")
+            Log.e(TAG, "System.loadLibrary(\"b\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "System.loadLibrary(\"b\") — FAILED", e)
+        }
+
         // Try explicit native library load first for better error reporting
         try {
             System.loadLibrary("arkui_android")

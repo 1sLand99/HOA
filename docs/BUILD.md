@@ -2,7 +2,11 @@
 
 HOA 基于 ArkUI-X 构建体系，通过 repo + manifest 管理 6 个定制仓库。
 
-构建流程: `repo init` → `prebuilts_download.sh` → `build.sh` → `sync_arkui_x.sh` → `gradlew assembleDebug`
+构建流程：
+
+- **一键构建：** `build_all.sh`（需设置 4 个环境变量，见下方）
+- **分步构建：** `repo init` → `prebuilts_download.sh` → `build.sh` → `build_musl_bridge.sh` → `sync_arkui_x.sh` → `gradlew assembleDebug`
+
 耗时数小时不等，磁盘需求约 100GB（源码 + 产物）。
 
 ---
@@ -56,7 +60,47 @@ HOA 项目根目录创建 `local.properties`：
 sdk.dir=/path/to/Android/Sdk
 ```
 
+### musl bridge 额外依赖
+
+构建 libb.so（musl ABI bridge）需要 NDK 28+ 的 aarch64 clang 工具链。libb.so 使 OHOS HAP 的闭源 .so 文件能在 Android bionic 上运行。
+
+```bash
+export ANDROID_NDK_HOME=/path/to/ndk/28.2.13676358
+export MUSL=/path/to/arkui-x/third_party/musl
+export ARKUI_X_SRC=/path/to/arkui-x
+export ARKUI_BUILD=$ARKUI_X_SRC/out/arkui-x/aosp_clang_arm64_release
+```
+
+> 这四个环境变量是 `build_all.sh` 的必需要求，缺一不可。详见[一键构建](#一键构建-build_allsh)。
+
 ---
+
+## 一键构建 (`build_all.sh`)
+
+`scripts/build_all.sh` 一次性完成全部 4 个步骤（ArkUI-X → libb.so → 同步 → APK）：
+
+```bash
+export ARKUI_X_SRC=/path/to/arkui-x
+export ARKUI_BUILD=$ARKUI_X_SRC/out/arkui-x/aosp_clang_arm64_release
+export ANDROID_NDK_HOME=/path/to/ndk/28.2.13676358
+export MUSL=$ARKUI_X_SRC/third_party/musl
+
+cd /path/to/HOA
+./scripts/build_all.sh
+```
+
+支持跳过部分步骤：
+
+```bash
+./scripts/build_all.sh --skip-arkui   # 跳过 ArkUI-X 编译
+./scripts/build_all.sh --skip-musl    # 跳过 libb.so 编译
+```
+
+以下为分步说明，供调试或增量构建参考。
+
+---
+
+## 分步构建
 
 ## Step 1: 下载源码
 
@@ -97,7 +141,23 @@ bash build/prebuilts_download.sh --build-arkuix --skip-ssl
 
 ---
 
-## Step 4: 同步产物到 HOA
+## Step 4: 编译 libb.so（musl ABI bridge）
+
+编译 musl 子集为 `libb.so`，使 OHOS HAP 的闭源 .so 能够通过 musl ABI 在 Android bionic 上运行。
+
+```bash
+cd /path/to/HOA/app/src/main/cpp
+MUSL=$ARKUI_X_SRC/third_party/musl bash build_musl_bridge.sh
+```
+
+产物：`app/src/main/jniLibs/arm64-v8a/libb.so`
+
+> libb.so 需要 NDK 28+ 的 aarch64 clang，与 APK 的 NDK 21 是两套独立工具链。
+> `build_musl_bridge.sh` 会检查 `ANDROID_NDK_HOME` 和 `MUSL` 两个环境变量。
+
+---
+
+## Step 5: 同步产物到 HOA
 
 将 ArkUI-X 构建的 .so、资源文件、jar 等复制到 HOA 项目对应目录。
 
@@ -114,7 +174,7 @@ ARKUI_BUILD=~/arkui-x-hoa/out/arkui-x/aosp_clang_arm64_release ./scripts/sync_ar
 
 ---
 
-## Step 5: 构建 APK
+## Step 6: 构建 APK
 
 ```bash
 ./gradlew assembleDebug
@@ -126,10 +186,25 @@ ARKUI_BUILD=~/arkui-x-hoa/out/arkui-x/aosp_clang_arm64_release ./scripts/sync_ar
 
 ## 常见工作流
 
-### 日常开发（修改了 Java/Kotlin 代码）
+### 完整重建
 
 ```bash
-./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk
+# 推荐：使用一键构建脚本
+cd /path/to/HOA
+ARKUI_X_SRC=/path/to/arkui-x \
+ARKUI_BUILD=/path/to/arkui-x/out/arkui-x/aosp_clang_arm64_release \
+ANDROID_NDK_HOME=/path/to/ndk \
+MUSL=/path/to/arkui-x/third_party/musl \
+./scripts/build_all.sh
+
+# 或者分步：
+cd ~/arkui-x-hoa
+./build.sh --product-name arkui-x --target-os android
+cd /path/to/HOA/app/src/main/cpp
+MUSL=~/arkui-x-hoa/third_party/musl bash build_musl_bridge.sh
+cd /path/to/HOA
+./scripts/sync_arkui_x.sh
+./gradlew assembleDebug
 ```
 
 ### 修改了 ArkUI-X C++ 代码
@@ -142,14 +217,19 @@ cd /path/to/HOA
 ./gradlew assembleDebug
 ```
 
-### 完整重建
+### 修改了 musl bridge 源码
 
 ```bash
-cd ~/arkui-x-hoa
-./build.sh --product-name arkui-x --target-os android
+cd /path/to/HOA/app/src/main/cpp
+MUSL=~/arkui-x-hoa/third_party/musl bash build_musl_bridge.sh
 cd /path/to/HOA
-./scripts/sync_arkui_x.sh
 ./gradlew assembleDebug
+```
+
+### 修改了 Java/Kotlin 代码
+
+```bash
+./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---
@@ -168,6 +248,8 @@ cd /path/to/HOA
            remote="hoa" revision="hoa-weekly" />
   <project path="build" name="build"
            remote="hoa" revision="hoa-weekly" />
+  <project path="build_plugins" name="build_plugins"
+           remote="hoa" revision="hoa-weekly" />
   <project path="foundation/appframework" name="app_framework"
            remote="hoa" revision="hoa-weekly" />
   <project path="foundation/arkui/ace_engine/adapter/android"
@@ -176,7 +258,7 @@ cd /path/to/HOA
            remote="hoa" revision="hoa-weekly" />
   <project path="plugins" name="plugins"
            remote="hoa" revision="hoa-weekly" />
+  <project path="third_party/musl" name="third_party_musl"
+           remote="hoa" revision="hoa-weekly" />
 </manifest>
 ```
-
-HOA 项目本地保留副本：`manifests/hoa-weekly.xml`。

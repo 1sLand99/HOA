@@ -1,0 +1,196 @@
+NDK       ?= $(ANDROID_NDK_HOME)
+LLVM      := $(NDK)/toolchains/llvm/prebuilt/linux-x86_64
+CC        := $(LLVM)/bin/aarch64-linux-android26-clang
+SYSROOT   := $(LLVM)/sysroot
+MUSL      ?= $(MUSL)
+SRCDIR    := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+SRCDIR    := $(patsubst %/,%,$(SRCDIR))
+OBJDIR    := $(SRCDIR)/obj
+GENHDIR   := $(OBJDIR)/gen
+OUTDIR    := $(SRCDIR)/../jniLibs/arm64-v8a
+TARGET    := $(OUTDIR)/libb.so
+
+# ── Include paths for musl sources (musl headers BEFORE NDK) ──────────
+CFLAGS_MUSL := \
+    -I$(GENHDIR) \
+    -I$(MUSL)/src/include \
+    -I$(MUSL)/arch/aarch64 \
+    -I$(MUSL)/arch/generic \
+    -I$(MUSL)/src/internal \
+    -I$(MUSL)/include \
+    -isystem $(SYSROOT)/usr/include \
+    -isystem $(SYSROOT)/usr/include/aarch64-linux-android
+
+# ── Bridge sources (NDK only, NO musl headers) ────────────────────────
+CFLAGS_BRIDGE := \
+    -isystem $(SYSROOT)/usr/include \
+    -isystem $(SYSROOT)/usr/include/aarch64-linux-android
+
+# ── Common flags ──────────────────────────────────────────────────────
+CFLAGS_COMMON := \
+    --target=aarch64-linux-android26 \
+    --sysroot=$(SYSROOT) \
+    -fPIC \
+    -std=c11 \
+    -D__ANDROID__ \
+    -D__HISPARK_LINUX__ \
+    -D_GNU_SOURCE \
+    -Os \
+    -g0 \
+    -ffunction-sections \
+    -fdata-sections \
+    -Wno-unused-parameter \
+    -Wno-implicit-function-declaration
+
+LDFLAGS := \
+    -shared \
+    -nostdlib \
+    -L$(SYSROOT)/usr/lib/aarch64-linux-android/26 \
+    -Wl,--allow-shlib-undefined \
+    -Wl,--version-script=$(SRCDIR)/libb.map \
+    -Wl,--gc-sections \
+    -Wl,-soname,libb.so
+
+LDLIBS := \
+    -lc \
+    -lm \
+    -ldl \
+    $(LLVM)/lib/clang/19/lib/linux/libclang_rt.builtins-aarch64-android.a
+
+ASFLAGS := \
+    --target=aarch64-linux-android26 \
+    --sysroot=$(SYSROOT) \
+    -I$(MUSL)/src/internal
+
+# ── Source files ──────────────────────────────────────────────────────
+
+MUSL_THREAD_C := $(filter-out %/__unmapself.c %/__tls_get_addr.c %/clone.c %/__set_thread_area.c, $(wildcard $(MUSL)/src/thread/*.c))
+MUSL_THREAD_S := $(wildcard $(MUSL)/src/thread/aarch64/*.s)
+
+MUSL_STDIO_C := $(filter-out %/__stdio_exit.c, $(wildcard $(MUSL)/src/stdio/*.c))
+
+MUSL_INTERNAL_C := \
+    $(MUSL)/src/internal/libc.c \
+    $(MUSL)/src/internal/defsysinfo.c \
+    $(MUSL)/src/internal/syscall_ret.c \
+    $(MUSL)/src/internal/procfdname.c \
+    $(MUSL)/src/internal/version.c \
+    $(MUSL)/src/internal/floatscan.c \
+    $(MUSL)/src/internal/intscan.c \
+    $(MUSL)/src/internal/shgetc.c
+
+MUSL_DIRENT_C := $(wildcard $(MUSL)/src/dirent/*.c)
+
+MUSL_ERRNO_C := \
+    $(MUSL)/src/errno/strerror.c
+
+MUSL_SETJMP_C := \
+    $(MUSL)/src/setjmp/setjmp.c \
+    $(MUSL)/src/setjmp/longjmp.c
+MUSL_SETJMP_S := $(wildcard $(MUSL)/src/setjmp/aarch64/*.s)
+
+MUSL_TIME_C := \
+    $(MUSL)/src/time/clock_gettime.c \
+    $(MUSL)/src/time/clock_nanosleep.c
+
+MUSL_SIGNAL_C := \
+    $(MUSL)/src/signal/block.c
+
+MUSL_MMAN_C := \
+    $(MUSL)/src/mman/mmap.c \
+    $(MUSL)/src/mman/mprotect.c \
+    $(MUSL)/src/mman/munmap.c \
+    $(MUSL)/src/mman/shm_open.c
+
+MUSL_UNISTD_C := \
+    $(MUSL)/src/unistd/lseek.c \
+    $(MUSL)/src/unistd/dup3.c
+
+MUSL_LOCALE_C := \
+    $(MUSL)/src/locale/c_locale.c \
+    $(MUSL)/src/locale/__lctrans.c
+
+MUSL_TEMP_C := \
+    $(MUSL)/src/temp/__randname.c
+
+MUSL_STRING_C := \
+    $(MUSL)/src/string/strchrnul.c \
+    $(MUSL)/src/string/strverscmp.c
+
+MUSL_SRCS := $(MUSL_THREAD_C) $(MUSL_STDIO_C) $(MUSL_INTERNAL_C) \
+             $(MUSL_DIRENT_C) $(MUSL_ERRNO_C) $(MUSL_SETJMP_C) \
+             $(MUSL_TIME_C) $(MUSL_SIGNAL_C) $(MUSL_MMAN_C) \
+             $(MUSL_UNISTD_C) $(MUSL_LOCALE_C) $(MUSL_TEMP_C) \
+             $(MUSL_STRING_C)
+MUSL_ASMS := $(MUSL_THREAD_S) $(MUSL_SETJMP_S)
+
+BRIDGE_SRCS := \
+    $(SRCDIR)/pthread_bridge.c \
+    $(SRCDIR)/malloc_bridge.c \
+    $(SRCDIR)/musl_stubs.c \
+    $(SRCDIR)/elf_patch.c \
+    $(SRCDIR)/elf_patch_jni.c
+
+# ── Object files ──────────────────────────────────────────────────────
+
+MUSL_OBJS := $(patsubst $(MUSL)/%.c,$(OBJDIR)/musl/%.o,$(MUSL_SRCS))
+MUSL_AOBJ := $(patsubst $(MUSL)/%.s,$(OBJDIR)/musl/%.o,$(MUSL_ASMS))
+BRIDGE_OBJ := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/bridge/%.o,$(BRIDGE_SRCS))
+
+ALL_OBJS := $(MUSL_OBJS) $(MUSL_AOBJ) $(BRIDGE_OBJ)
+
+# ── Generated headers ─────────────────────────────────────────────────
+
+GENERATED := \
+    $(GENHDIR)/bits/syscall.h \
+    $(GENHDIR)/bits/alltypes.h \
+    $(GENHDIR)/version.h \
+    $(GENHDIR)/info/fatal_message.h
+
+# ── Stub headers for OHOS-specific includes ──────────────────────────
+# param_check.h includes <info/fatal_message.h> which is OHOS-only.
+# We provide a stub so PARAM_CHECK (NULL-check + abort) compiles.
+$(GENHDIR)/info/fatal_message.h: | $(GENHDIR)/info
+	echo 'static inline void set_fatal_message(const char *msg) { (void)msg; }' > $@
+
+$(GENHDIR) $(GENHDIR)/bits $(GENHDIR)/info $(OBJDIR) $(OUTDIR):
+	mkdir -p $@
+
+# ── Build rules ───────────────────────────────────────────────────────
+
+.PHONY: all clean
+all: $(TARGET)
+
+$(TARGET): $(ALL_OBJS) | $(OUTDIR)
+	$(CC) $(CFLAGS_COMMON) $(LDFLAGS) -o $@ $(ALL_OBJS) $(LDLIBS)
+
+$(GENHDIR)/bits/syscall.h: | $(GENHDIR)/bits
+	cp $(MUSL)/arch/aarch64/bits/syscall.h.in $@
+	sed -n 's/^#define __NR_\([a-zA-Z0-9_]*\) .*/#define SYS_\1 __NR_\1/p' $@ >> $@
+
+$(GENHDIR)/bits/alltypes.h: | $(GENHDIR)/bits
+	sed -f $(MUSL)/tools/mkalltypes.sed \
+	    $(MUSL)/arch/aarch64/bits/alltypes.h.in \
+	    $(MUSL)/include/alltypes.h.in \
+	    > $@
+
+$(GENHDIR)/version.h: | $(GENHDIR)
+	echo '#define VERSION "1.2.5-android"' > $@
+
+# musl C sources
+$(OBJDIR)/musl/%.o: $(MUSL)/%.c $(GENERATED)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_COMMON) $(CFLAGS_MUSL) -c -o $@ $<
+
+# musl assembly sources
+$(OBJDIR)/musl/%.o: $(MUSL)/%.s
+	@mkdir -p $(dir $@)
+	$(CC) $(ASFLAGS) -c -o $@ $<
+
+# bridge C sources (NDK headers only)
+$(OBJDIR)/bridge/%.o: $(SRCDIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_COMMON) $(CFLAGS_BRIDGE) -c -o $@ $<
+
+clean:
+	rm -rf $(OBJDIR) $(TARGET)
