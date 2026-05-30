@@ -75,18 +75,28 @@
     <string name="dialog_permissions_title">Permissions</string>
     <string name="dialog_permissions_msg">You\'ll be taken to the system app settings.\n\nFind the \"Permissions\" section and grant the permissions your HAPs need.</string>
     <string name="dialog_permissions_go">Go to Settings</string>
-    <string name="menu_export_logs">Export Logs</string>
-    <string name="menu_report_issue">Report Issue</string>
-    <string name="dialog_report_issue_title">Report Issue</string>
-    <string name="dialog_report_issue_gitcode">Gitcode</string>
-    <string name="dialog_report_issue_github">GitHub</string>
+    <string name="menu_feedback">Feedback</string>
+    <string name="menu_check_update">Check for Updates</string>
+    <string name="dialog_feedback_title">Feedback</string>
+    <string name="dialog_feedback_export_logs">Export Logs</string>
+    <string name="dialog_feedback_gitcode">Gitcode Issues</string>
+    <string name="dialog_feedback_github">GitHub Issues</string>
 
     <!-- First launch -->
     <string name="first_launch_title">Early Stage Notice</string>
     <string name="first_launch_msg">HOA is in early development and currently only supports a limited set of HAPs. Many features are still incomplete.\n\nIf you encounter issues, you can export logs via the menu and share them for feedback.</string>
     <string name="first_launch_btn">I Understand</string>
 
+    <!-- Update check -->
+    <string name="update_dialog_title">Update Available</string>
+    <string name="update_dialog_msg">A new version is available (released %1$s).\n\nPlease download the latest APK from the releases page.</string>
+    <string name="update_dialog_go">Download</string>
+    <string name="update_dialog_uptodate">You are on the latest version.</string>
+    <string name="update_check_failed">Check failed: %1$s</string>
+
     <!-- Log export -->
     <string name="toast_logs_exporting">Preparing log archive…</string>
+    <string name="toast_logs_exported">Logs Exported</string>
+    <string name="dialog_share">Share</string>
     <string name="toast_logs_export_failed">Log export failed: %1$s</string>
 </resources>

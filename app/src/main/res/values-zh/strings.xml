@@ -76,18 +76,28 @@
     <string name="dialog_permissions_title">权限管理</string>
     <string name="dialog_permissions_msg">即将跳转到系统应用设置，请在页面中找到「权限管理」选项，根据需要勾选允许相关权限。</string>
     <string name="dialog_permissions_go">前往设置</string>
-    <string name="menu_export_logs">导出日志</string>
-    <string name="menu_report_issue">问题反馈</string>
-    <string name="dialog_report_issue_title">问题反馈</string>
-    <string name="dialog_report_issue_gitcode">Gitcode</string>
-    <string name="dialog_report_issue_github">GitHub</string>
+    <string name="menu_feedback">反馈</string>
+    <string name="menu_check_update">检查更新</string>
+    <string name="dialog_feedback_title">反馈</string>
+    <string name="dialog_feedback_export_logs">导出日志</string>
+    <string name="dialog_feedback_gitcode">Gitcode Issues</string>
+    <string name="dialog_feedback_github">GitHub Issues</string>
 
     <!-- First launch -->
     <string name="first_launch_title">早期版本提示</string>
     <string name="first_launch_msg">HOA 目前处于早期开发阶段，仅能较完善地支持部分 HAP，多数功能仍不完善。\n\n如遇到运行问题，可通过菜单导出日志并反馈给开发者。</string>
     <string name="first_launch_btn">我知道了</string>
 
+    <!-- Update check -->
+    <string name="update_dialog_title">发现新版本</string>
+    <string name="update_dialog_msg">检测到新版本（发布于 %1$s）。\n\n请前往下载页面获取最新 APK。</string>
+    <string name="update_dialog_go">前往下载</string>
+    <string name="update_dialog_uptodate">当前已是最新版本。</string>
+    <string name="update_check_failed">检查失败: %1$s</string>
+
     <!-- Log export -->
     <string name="toast_logs_exporting">正在准备日志文件…</string>
+    <string name="toast_logs_exported">日志已导出</string>
+    <string name="dialog_share">分享</string>
     <string name="toast_logs_export_failed">日志导出失败: %1$s</string>
 </resources>

@@ -16,11 +16,17 @@ object LogCollector {
 
     private const val TAG = "HOA.LogCollector"
 
-    fun exportAndShare(context: Context, onError: (String) -> Unit) {
+    fun export(
+        context: Context,
+        onComplete: (exportPath: String) -> Unit,
+        onError: (String) -> Unit
+    ) {
         Thread {
             try {
                 val zipFile = createExportZip(context)
-                shareZip(context, zipFile)
+                val exportFile = copyToLogsDir(context, zipFile)
+                LogWriter.i(TAG, "Logs exported: ${exportFile.absolutePath}")
+                onComplete(exportFile.absolutePath)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to export logs", e)
                 onError(e.message ?: "Unknown error")
@@ -28,50 +34,17 @@ object LogCollector {
         }.start()
     }
 
-    private fun createExportZip(context: Context): File {
-        val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val zipFile = File(context.cacheDir, "hoa_logs_$ts.zip")
+    fun share(context: Context, zipPath: String) {
+        val zipFile = File(zipPath)
+        if (!zipFile.exists()) return
 
-        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
-            // App log files
-            for (logFile in LogWriter.getLogFiles()) {
-                zos.putNextEntry(ZipEntry("app/${logFile.name}"))
-                logFile.inputStream().use { it.copyTo(zos) }
-                zos.closeEntry()
-            }
-
-            // logcat snapshot
-            zos.putNextEntry(ZipEntry("logcat.txt"))
-            val logcat = captureLogcat()
-            zos.write(logcat.toByteArray())
-            zos.closeEntry()
-        }
-
-        LogWriter.i(TAG, "Log export zip created: ${zipFile.name} (${zipFile.length()} bytes)")
-        return zipFile
-    }
-
-    private fun captureLogcat(): String {
-        return try {
-            val process = Runtime.getRuntime().exec(
-                arrayOf("logcat", "-d", "-v", "threadtime", "*:V")
-            )
-            val out = process.inputStream.bufferedReader().readText()
-            val err = process.errorStream.bufferedReader().readText()
-            process.waitFor()
-            if (out.isNotEmpty()) out else "(logcat empty; stderr: $err)"
-        } catch (e: Exception) {
-            "(logcat failed: ${e.message})"
-        }
-    }
-
-    private fun shareZip(context: Context, zipFile: File) {
-        // Write to a stable location so FileProvider can serve it.
-        // cacheDir is cleaned aggressively on some devices, so copy to filesDir.
+        // Copy to internal filesDir for FileProvider if needed
         val shareDir = File(context.filesDir, "shared_logs")
         shareDir.mkdirs()
         val sharedFile = File(shareDir, zipFile.name)
-        zipFile.copyTo(sharedFile, overwrite = true)
+        if (sharedFile.absolutePath != zipFile.absolutePath) {
+            zipFile.copyTo(sharedFile, overwrite = true)
+        }
 
         try {
             val uri = FileProvider.getUriForFile(
@@ -89,14 +62,57 @@ object LogCollector {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         } catch (e: IllegalArgumentException) {
-            // FileProvider not configured — fall back to a basic intent
-            LogWriter.w(TAG, "FileProvider failed, trying without", e)
+            LogWriter.w(TAG, "FileProvider failed", e)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/zip"
-                putExtra(Intent.EXTRA_TEXT, "Logs saved to: ${sharedFile.absolutePath}")
+                putExtra(Intent.EXTRA_TEXT, "Logs saved to: ${zipFile.absolutePath}")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(Intent.createChooser(intent, "Share HOA Logs"))
+        }
+    }
+
+    private fun createExportZip(context: Context): File {
+        val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val zipFile = File(context.cacheDir, "hoa_logs_$ts.zip")
+
+        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+            for (logFile in LogWriter.getLogFiles()) {
+                zos.putNextEntry(ZipEntry("app/${logFile.name}"))
+                logFile.inputStream().use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+
+            zos.putNextEntry(ZipEntry("logcat.txt"))
+            val logcat = captureLogcat()
+            zos.write(logcat.toByteArray())
+            zos.closeEntry()
+        }
+
+        return zipFile
+    }
+
+    private fun copyToLogsDir(context: Context, zipFile: File): File {
+        val logDir = LogWriter.getLogDir()
+        if (logDir != null) {
+            return File(logDir, zipFile.name).also { zipFile.copyTo(it, overwrite = true) }
+        }
+        val fallback = File(context.filesDir, "shared_logs")
+        fallback.mkdirs()
+        return File(fallback, zipFile.name).also { zipFile.copyTo(it, overwrite = true) }
+    }
+
+    private fun captureLogcat(): String {
+        return try {
+            val process = Runtime.getRuntime().exec(
+                arrayOf("logcat", "-d", "-v", "threadtime", "*:V")
+            )
+            val out = process.inputStream.bufferedReader().readText()
+            val err = process.errorStream.bufferedReader().readText()
+            process.waitFor()
+            if (out.isNotEmpty()) out else "(logcat empty; stderr: $err)"
+        } catch (e: Exception) {
+            "(logcat failed: ${e.message})"
         }
     }
 }

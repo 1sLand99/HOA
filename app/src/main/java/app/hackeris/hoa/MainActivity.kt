@@ -154,17 +154,14 @@ class MainActivity : AppCompatActivity() {
                 showPermissionsDialog()
                 return true
             }
-            R.id.action_export_logs -> {
-                Toast.makeText(this, getString(R.string.toast_logs_exporting), Toast.LENGTH_SHORT).show()
-                LogCollector.exportAndShare(this) { error ->
-                    runOnUiThread {
-                        Toast.makeText(this, getString(R.string.toast_logs_export_failed, error), Toast.LENGTH_LONG).show()
-                    }
-                }
+            R.id.action_feedback -> {
+                showFeedbackDialog()
                 return true
             }
-            R.id.action_report_issue -> {
-                showReportIssueDialog()
+            R.id.action_check_update -> {
+                UpdateChecker.check(this) { result ->
+                    UpdateChecker.showResult(this, result)
+                }
                 return true
             }
             else -> return super.onOptionsItemSelected(item)
@@ -540,20 +537,42 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showReportIssueDialog() {
+    private fun showFeedbackDialog() {
         val items = arrayOf(
-            getString(R.string.dialog_report_issue_gitcode),
-            getString(R.string.dialog_report_issue_github)
-        )
-        val urls = arrayOf(
-            "https://gitcode.com/harmony-on-android/HOA/issues",
-            "https://github.com/harmony-on-android/HOA/issues"
+            getString(R.string.dialog_feedback_export_logs),
+            getString(R.string.dialog_feedback_gitcode),
+            getString(R.string.dialog_feedback_github)
         )
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.dialog_report_issue_title))
+            .setTitle(getString(R.string.dialog_feedback_title))
             .setItems(items) { _, which ->
-                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(urls[which]))
-                startActivity(intent)
+                when (which) {
+                    0 -> {
+                        Toast.makeText(this, getString(R.string.toast_logs_exporting), Toast.LENGTH_SHORT).show()
+                        LogCollector.export(
+                            this,
+                            onComplete = { path ->
+                                runOnUiThread {
+                                    AlertDialog.Builder(this)
+                                        .setTitle(getString(R.string.toast_logs_exported))
+                                        .setMessage(path)
+                                        .setPositiveButton(getString(R.string.dialog_share)) { _, _ ->
+                                            LogCollector.share(this, path)
+                                        }
+                                        .setNegativeButton(android.R.string.ok, null)
+                                        .show()
+                                }
+                            },
+                            onError = { error ->
+                                runOnUiThread {
+                                    Toast.makeText(this, getString(R.string.toast_logs_export_failed, error), Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        )
+                    }
+                    1 -> startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://gitcode.com/harmony-on-android/HOA/issues")))
+                    2 -> startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/harmony-on-android/HOA/issues")))
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
