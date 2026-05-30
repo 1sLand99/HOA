@@ -1,0 +1,1 @@
+/* stub: musl <fortify/socket.h> — OHOS fortify wrappers. Not used on Android. */

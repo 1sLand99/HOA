@@ -1,0 +1,1 @@
+/* stub: musl <fortify/stat.h> — OHOS fortify wrappers. Not used on Android. */
