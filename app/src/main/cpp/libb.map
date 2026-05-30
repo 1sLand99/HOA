@@ -75,21 +75,6 @@
         __libc_realloc;
         __libc_calloc;
 
-        /* clone diagnostics */
-        __clone_dbg_called;
-        __clone_dbg_ret;
-        __clone_dbg_errno;
-        __clone_dbg_flags;
-        __clone_dbg_clean;
-
-        /* pthread_create stage diagnostics */
-        __pthread_create_stage;
-        __pthread_create_fail_errno;
-        __pthread_create_size;
-        __pthread_create_guard;
-        __pthread_create_tls_size;
-        __pthread_create_tsd_size;
-
         /* bridge API */
         __musl_bridge_self;
         __musl_bridge_register;
