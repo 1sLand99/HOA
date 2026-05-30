@@ -95,6 +95,10 @@
         sigprocmask;
         kill;
 
+        /* sigsetjmp — musl jmp_buf layout differs from bionic */
+        sigsetjmp;
+        siglongjmp;
+
     local:
         *;
 };

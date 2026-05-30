@@ -109,10 +109,13 @@ MUSL_SIGNAL_C := \
     $(MUSL)/src/signal/sigemptyset.c \
     $(MUSL)/src/signal/sigfillset.c \
     $(MUSL)/src/signal/sigismember.c \
-    $(MUSL)/src/signal/sigpending.c
+    $(MUSL)/src/signal/sigpending.c \
+    $(MUSL)/src/signal/siglongjmp.c \
+    $(MUSL)/src/signal/sigsetjmp_tail.c
 
 MUSL_SIGNAL_S := \
-    $(MUSL)/src/signal/aarch64/restore.s
+    $(MUSL)/src/signal/aarch64/restore.s \
+    $(MUSL)/src/signal/aarch64/sigsetjmp.s
 
 # abort_lock.c is in src/exit/ but sigaction.c needs it
 MUSL_ABORT_LOCK := \
