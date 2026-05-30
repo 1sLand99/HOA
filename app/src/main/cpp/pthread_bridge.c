@@ -30,16 +30,16 @@ static struct {
     struct pthread *self;
 } self_table[MAX_SELF_ENTRIES];
 
-static int self_count = 0;
+static volatile int self_count = 0;
 
-// ── Forward declaration of musl struct pthread ──────────────────────
+// ── struct pthread and offset constants ───────────────────────────────
 //
 // These 8 fields match the start of the real OHOS musl struct pthread
 // on aarch64 LP64 (TLS_ABOVE_TP).  Verified against the source at
 // third_party/musl/src/internal/pthread_impl.h.
 //
 // Fields beyond offset 48 are accessed via (char *) + hardcoded offset;
-// see the initialization block below for the offset map.
+// see the offset map below.
 struct pthread {
     struct pthread *self;     // offset  0
     struct pthread *prev;     // offset  8
@@ -66,20 +66,42 @@ struct pthread {
 #define OFF_LOCALE        160   // locale_t (struct __locale_struct *)
 #define OFF_KILLLOCK      168   // volatile int[1]
 #define OFF_DLERROR_BUF   176   // char *
-#define OFF_CANCEL        208   // volatile int (was 216 in analysis; OHOS fork shifts)
+#define OFF_CANCEL        208   // volatile int
 #define OFF_CANCELDISABLE 212   // volatile unsigned char
 #define OFF_CANCELASYNC   213   // volatile unsigned char
 
+// ── Validate a struct pthread before returning it ────────────────────
+static struct pthread *validate_self(struct pthread *self, pid_t tid, int idx)
+{
+    if (!self) return self;
+
+    // Verify self->self == self (first field should point to itself)
+    if (self->self != self) {
+        return NULL;
+    }
+
+    // Verify tsd is non-NULL
+    void *tsd = *(void **)((char *)self + OFF_TSD);
+    if (!tsd) {
+        return NULL;
+    }
+    return self;
+}
 static void *global_locale_ptr;  // set by constructor from musl's __libc
 
 // musl thread entry calls this after tpidr_el0 is set
 void __musl_bridge_register(struct pthread *self)
 {
+    // Validate the tcb looks right
+    if (self->self != self) {
+        return;
+    }
+
     lock_table();
     if (self_count < MAX_SELF_ENTRIES) {
         self_table[self_count].tid  = self->tid;
         self_table[self_count].self = self;
-        self_count++;
+        __atomic_fetch_add(&self_count, 1, __ATOMIC_RELEASE);
     }
     unlock_table();
 }
@@ -97,9 +119,12 @@ struct pthread *__musl_bridge_self(void)
     pid_t tid = (pid_t)syscall(SYS_gettid);
 
     // Lock-free read: table is append-only, self_count is monotonic.
-    for (int i = 0; i < self_count; i++) {
-        if (self_table[i].tid == tid)
-            return self_table[i].self;
+    // Scan backwards so the most recent entry for a recycled tid wins.
+    int n = __atomic_load_n(&self_count, __ATOMIC_ACQUIRE);
+    for (int i = n - 1; i >= 0; i--) {
+        if (self_table[i].tid == tid) {
+            return validate_self(self_table[i].self, tid, i);
+        }
     }
 
     // First call from this bionic thread — allocate a musl struct pthread.
@@ -143,11 +168,11 @@ struct pthread *__musl_bridge_self(void)
     if (self_count < MAX_SELF_ENTRIES) {
         self_table[self_count].tid  = tid;
         self_table[self_count].self = new_self;
-        self_count++;
+        __atomic_fetch_add(&self_count, 1, __ATOMIC_RELEASE);
     }
     unlock_table();
 
-    return new_self;
+    return validate_self(new_self, tid, -1);
 }
 
 // ── errno delegation to bionic ──────────────────────────────────────
@@ -204,6 +229,11 @@ static void __musl_bridge_init(void)
     // Enable thread creation.
     ((volatile signed char *)&__libc)[0] = 1;  // can_do_threads
     ((volatile signed char *)&__libc)[3] = 1;  // need_locks
+
+    // Set tls_size to 4096. With tls_size=0 (BSS), __copy_tls places
+    // struct pthread at the same address as the TSD array, causing
+    // self->self (offset 0) to overlap with tsd[0] → self corruption.
+    *(size_t *)(&__libc + 24) = 4096;
 
     // Set page_size to 4096. Without this, ROUND() returns 0 and mmap
     // fails with EINVAL inside pthread_create.

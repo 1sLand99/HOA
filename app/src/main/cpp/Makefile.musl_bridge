@@ -13,6 +13,7 @@ TARGET    := $(OUTDIR)/libb.so
 # ── Include paths for musl sources (musl headers BEFORE NDK) ──────────
 CFLAGS_MUSL := \
     -I$(GENHDIR) \
+    -I$(SRCDIR)/stub \
     -I$(MUSL)/src/include \
     -I$(MUSL)/arch/aarch64 \
     -I$(MUSL)/arch/generic \
@@ -183,6 +184,8 @@ $(GENHDIR) $(GENHDIR)/bits $(GENHDIR)/info $(OBJDIR) $(OUTDIR):
 	mkdir -p $@
 
 # ── Build rules ───────────────────────────────────────────────────────
+
+.DEFAULT_GOAL := all
 
 .PHONY: all clean
 all: $(TARGET)

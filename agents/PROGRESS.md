@@ -224,7 +224,22 @@ Phase 1 仅支持依赖 bionic libc 的简单 .so。当 HAP .so 使用 `pthread_
 | `fopen/fwrite/fclose` | ✅ | musl FILE\* 生命周期，文件写入成功 |
 | `opendir/readdir/closedir` | ✅ | 列出 13 个文件，errno 委托 bionic 正常 |
 
-### 14. HAP 原生 .so 支持 — Phase 1 最小方案（2026-05-29）
+### 14. libb.so struct pthread 与 TSD 数组重叠崩溃修复（2026-05-30）
+
+musl 子线程退出时 SIGTRAP 崩溃，backtrace 指向 `validate_self` → `__musl_bridge_self` → `pthread_exit` → `start`。崩溃原因是 `self->self != self`，即 struct pthread 的 `self` 指针被覆盖。
+
+**根因**：`libc.tls_size` 未初始化（BSS 默认 0），导致 `__copy_tls()` 中将 struct pthread 放在与 TSD 数组**相同的地址**（`tsd - 0 = tsd`）。`self->self`（偏移 0）和 `tsd[0]` 共享同一内存，一旦 TSD 写入就覆盖 self 指针。
+
+**修复**：在 `pthread_bridge.c` 构造函数中加 `*(size_t *)(&__libc + 24) = 4096`，在 TSD 数组下方预留空间给 struct pthread。同时清理调试代码（移除 `__builtin_trap()`、`raw_write` 函数，简化 `validate_self` 为静默返回 NULL）。
+
+**仓库改动**：
+
+| 仓库 | 改动 | 说明 |
+|------|------|------|
+| `third_party/musl` | 1 文件 | `pthread_key_create.c`：移除 `__builtin_trap()`，改为安全 early return |
+| HOA `app/src/main/cpp/` | 2 文件 | `pthread_bridge.c`：tls_size 初始化、validate_self 简化、诊断代码移除；`Makefile.musl_bridge`：链接调整 |
+
+### 15. HAP 原生 .so 支持 — Phase 1 最小方案（2026-05-29）
 
 在不修改 OHOS HAP 的前提下，让其中的闭源原生 .so 在 Android 上加载运行。测试用例 `native-example`（`libentry.so` 导出 `add(a,b)` NAPI 函数）跑通：`Test NAPI 2 + 3 = 5`。
 
