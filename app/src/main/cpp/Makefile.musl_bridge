@@ -91,7 +91,10 @@ MUSL_SETJMP_S := $(wildcard $(MUSL)/src/setjmp/aarch64/*.s)
 
 MUSL_TIME_C := \
     $(MUSL)/src/time/clock_gettime.c \
-    $(MUSL)/src/time/clock_nanosleep.c
+    $(MUSL)/src/time/clock_nanosleep.c \
+    $(MUSL)/src/time/gettimeofday.c \
+    $(MUSL)/src/time/time.c \
+    $(MUSL)/src/time/strftime.c
 
 MUSL_SIGNAL_C := \
     $(MUSL)/src/signal/block.c
@@ -120,11 +123,30 @@ MUSL_STRING_C := \
 MUSL_ENV_C := \
     $(MUSL)/src/env/__init_tls.c
 
+MUSL_STDLIB_C := \
+    $(MUSL)/src/stdlib/atoi.c \
+    $(MUSL)/src/stdlib/strtol.c \
+    $(MUSL)/src/stdlib/qsort.c
+
+MUSL_NETWORK_C := \
+    $(MUSL)/src/network/socket.c \
+    $(MUSL)/src/network/connect.c \
+    $(MUSL)/src/network/bind.c \
+    $(MUSL)/src/network/listen.c \
+    $(MUSL)/src/network/accept.c \
+    $(MUSL)/src/network/send.c \
+    $(MUSL)/src/network/recv.c
+
+MUSL_SELECT_C := \
+    $(MUSL)/src/select/poll.c \
+    $(MUSL)/src/select/select.c
+
 MUSL_SRCS := $(MUSL_THREAD_C) $(MUSL_STDIO_C) $(MUSL_INTERNAL_C) \
              $(MUSL_DIRENT_C) $(MUSL_ERRNO_C) $(MUSL_SETJMP_C) \
              $(MUSL_TIME_C) $(MUSL_SIGNAL_C) $(MUSL_MMAN_C) \
              $(MUSL_UNISTD_C) $(MUSL_LOCALE_C) $(MUSL_TEMP_C) \
-             $(MUSL_STRING_C) $(MUSL_ENV_C)
+             $(MUSL_STRING_C) $(MUSL_ENV_C) $(MUSL_STDLIB_C) \
+             $(MUSL_NETWORK_C) $(MUSL_SELECT_C)
 MUSL_ASMS := $(MUSL_THREAD_S) $(MUSL_SETJMP_S)
 
 BRIDGE_SRCS := \
