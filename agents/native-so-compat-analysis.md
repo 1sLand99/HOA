@@ -272,44 +272,33 @@ inline uintptr_t* getPlatformAllocatorTlsSlot() {
 
 由于 musl 线程（HAP 自建线程）初期被禁止（见风险表），此问题短期不触发。但 `malloc_bridge.c` 的设计应在注释中标注此限制。
 
-### 3.5 musl `__thread` / `_Thread_local` 变量不支持
+### 3.5 musl `__thread` / `_Thread_local` 变量
 
-**现状**：HAP .so 中的 C11 `_Thread_local` 或 GNU `__thread` 变量无法正确工作。`clone_bridge.c` 剥离了 `CLONE_SETTLS`，子线程继承 bionic 的 TPIDR_EL0。但编译器为 `__thread` 变量生成的代码按 musl TCB 布局计算偏移，从 bionic TCB 读出的是错误数据。
+**结论（2026-05-31 修正）**：OHOS NDK (BiSheng) 和 Android NDK 均默认将 `__thread` 编译为 **emutls**（`__emutls_get_address`，LLVM 编译器内置的用户态 TLS），不生成 native ELF TLS 重定位。emutls 基于全局哈希表 + 线程私有存储，不依赖 TPIDR_EL0，在 bionic 线程开箱即用。只有显式传 `-fno-emulated-tls` 才会生成 native TLSDESC/GD 重定位。
 
-**为什么需要解决**：`__thread` 在 C/C++ 代码中很常见（errno 替代、per-thread cache、随机数生成器状态等）。实际 HAP 大概率会用到。
+实测验证：`static __thread int entry_tls_var = 0xCAFE` 在 HAP .so (OHOS NDK 编译) 中产生 `__emutls_v._ZL13entry_tls_var` 符号和 `__emutls_get_address@plt` 调用，主线程读写隔离正确，ALL 49 TESTS PASSED。
 
-**关键洞察**：HAP .so 作为共享库，编译时用 `-fPIC`，默认生成 **General Dynamic (GD)** TLS 模型。访问 `__thread` 变量时不直接读 TPIDR_EL0，而是调用 `__tls_get_addr(module_id, offset)` —— 这个调用走 GOT/PLT，可以被 GOT patching 拦截（与 sigaction 同样的机制）。
+**原始分析（已修正）**：
 
-AArch64 上共享库的 TLS 访问模型：
-| 模型 | 机制 | 是否可拦截 |
-|------|------|-----------|
-| General Dynamic (GD) | 调用 `__tls_get_addr()` 走 GOT | **可拦截，默认模型** |
-| Initial Exec (IE) | 从 GOT 加载偏移 + TPIDR_EL0 | 可 patch GOT 偏移值 |
-| Local Exec (LE) | 指令内硬编码偏移 + TPIDR_EL0 | 需指令级 patch，脆，仅可执行文件用 |
+> ~~AArch64 上共享库默认使用 General Dynamic (GD) 模型，访问 `__thread` 变量时调用 `__tls_get_addr(module_id, offset)` 走 GOT，可被 GOT patching 拦截。~~
 
-**方案**：GOT-patch `__tls_get_addr` → 桥接函数查 musl TLS 区 → 返回正确地址。
+这个假设错误——aarch64 LLVM 工具链（包括 OHOS BiSheng 和 Android NDK）的默认 TLS 策略是：
+1. **默认**：emutls（`-femulated-tls`，LLVM 默认）——纯用户态实现，生成 `__emutls_get_address` 调用
+2. **`-fno-emulated-tls`**：TLSDESC（aarch64 原生 TLS ABI）——生成 `R_AARCH64_TLSDESC_*` 重定位，由 linker 的 TLSDESC resolver 处理，不调 `__tls_get_addr`
+3. **`-fno-emulated-tls -ftls-model=global-dynamic`**：实测仍生成 TLSDESC（aarch64 上 GD=TLSDESC+Lazy）
 
-```
-HAP .so 访问 __thread var
-    → call __tls_get_addr(module_id, offset)    // GOT 入口，可 patch
-    → 桥接函数查当前线程的 musl struct pthread
-    → musl TLS 数据在 TP + sizeof(struct pthread) 处
-    → 返回 musl_tls_base + module_offset
-```
+**对 HOA 的影响**：
+| 场景 | 编译器 | 模型 | 状态 |
+|------|--------|------|------|
+| HAP .so `__thread`（默认构建） | OHOS BiSheng | emutls | ✅ 开箱可用（bionic 线程） |
+| HAP .so `__thread` + `-fno-emulated-tls` | OHOS BiSheng | TLSDESC | ❌ 需干预 TLSDESC entry（musl 线程） |
+| libb.so `__thread` | Android NDK | emutls | ✅ 开箱可用 |
 
-**已有基础**：
-- `pthread_bridge.c` 维护了 `gettid() → struct pthread*` 映射表（`self_table`）
-- `got_patch.c` / `elf_patch.c` 提供了成熟的 GOT patching 基础设施
-- musl `pthread_create` 创建线程时会拷贝 TLS 初始化镜像到 `TP + sizeof(struct pthread)` 处
-
-**待完成**：
-1. 获取 musl `struct pthread` 完整大小（当前 bridge 只定义了前 ~220 字节的字段偏移，实际约 300+ 字节），用于计算 TLS 数据起始地址
-2. 实现 `__tls_get_addr` 桥接函数：查 self_table → 定位 musl TLS 区 → 返回 `base + module_offset`
-3. 在 `got_patch.c` 中新增 `__tls_get_addr` 的 GOT patch 规则
-4. IE 模型兜底：安装时扫描 `R_AARCH64_TLS_TPREL` 重定位，改写 GOT 偏移值
-5. LE 模型暂不处理（共享库不会默认生成，除非显式 `-ftls-model=local-exec`）
-
-**风险**：AARch64 Android 上 TLS slot 布局可能因版本变化；bionic scudo 仍使用 bionic TP（见 3.4 节），两套 TLS 共存是设计目标。
+**后续：musl 线程的 native TLS**：
+若 HAP 显式编译为 native TLS（`-fno-emulated-tls`），需要在 musl 线程上干预 TLSDESC entry：
+- 注册 HAP .so 的 PT_TLS 到 musl `libc.tls_head` 链（`pthread_bridge.c` 已预留基础设施）
+- TLSDESC entry 级 patch（非 GOT 符号 patch）使 musl 线程返回 musl TP 兼容的偏移
+- bionic 线程保持原 TLSDESC resolver 不变
 
 ### 3.6 bridge struct 必须初始化的字段（源码审计结论）
 
