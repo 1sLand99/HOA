@@ -50,6 +50,12 @@ open class HoaAbilityActivity : StageActivity() {
             Log.e(TAG, "setInstanceName() FAILED", e)
         }
 
+        // Preload all .so files from the HAP libs directory so that
+        // DT_NEEDED dependencies within the HAP resolve correctly.
+        // Without this, libentry.so → libhelper.so fails because the
+        // linker does not search the HAP extraction directory by default.
+        preloadNativeDeps(bundleName, moduleName)
+
         try {
             super.onCreate(savedInstanceState)
             Log.e(TAG, "super.onCreate() completed — ArkUI rendering surface should be created")
@@ -174,6 +180,66 @@ open class HoaAbilityActivity : StageActivity() {
             setTaskDescription(ActivityManager.TaskDescription(displayName))
         }
         Log.e(TAG, "applyHapTaskDescription: title=$displayName icon=${bitmap != null}")
+    }
+
+    // ============================================================
+    // Preload all .so files from the HAP libs directory.
+    //
+    // HAP .so files that DT_NEEDED other .so files in the same HAP
+    // (e.g. libentry.so → libhelper.so) can't resolve those deps
+    // because the linker does not search the extraction directory.
+    //
+    // By loading all .so files via System.load() before ArkUI-X
+    // dlopen's the main module, every dependency is already in
+    // memory and DT_NEEDED resolution succeeds by refcount bump.
+    //
+    // Files whose own deps are not yet satisfied will fail (caught);
+    // they will be loaded later by ArkUI-X once their deps are met.
+    // ============================================================
+    private fun preloadNativeDeps(bundleName: String, moduleName: String) {
+        val fullModuleName = "$bundleName.$moduleName"
+        val libsDir = File(filesDir, "hap/$fullModuleName/libs")
+        if (!libsDir.isDirectory) {
+            Log.e(TAG, "preloadNativeDeps: libs dir not found at $libsDir")
+            return
+        }
+
+        val soFiles = libsDir.walkTopDown()
+            .filter { it.isFile && it.extension == "so" }
+            .toList()
+
+        if (soFiles.isEmpty()) {
+            Log.e(TAG, "preloadNativeDeps: no .so files found")
+            return
+        }
+
+        // Multi-pass topological load.  A single pass fails when libA
+        // (which NEEDED libB) is tried before libB.  Retry until no
+        // progress is made, so chains like A→B→C resolve correctly.
+        Log.e(TAG, "preloadNativeDeps: found ${soFiles.size} .so file(s)")
+        var remaining = soFiles.toMutableList()
+        var pass = 0
+        while (remaining.isNotEmpty()) {
+            pass++
+            var progress = false
+            val iter = remaining.iterator()
+            while (iter.hasNext()) {
+                val soFile = iter.next()
+                try {
+                    System.load(soFile.absolutePath)
+                    iter.remove()
+                    progress = true
+                    Log.e(TAG, "preloadNativeDeps: loaded ${soFile.name} (pass $pass)")
+                } catch (_: UnsatisfiedLinkError) {
+                    // dep not yet satisfied — retry next pass
+                }
+            }
+            if (!progress) break
+        }
+
+        if (remaining.isNotEmpty()) {
+            Log.w(TAG, "preloadNativeDeps: ${remaining.size} .so(s) still unresolved after $pass passes: ${remaining.map { it.name }}")
+        }
     }
 
     private fun moduleExists(bundleName: String, moduleName: String): Boolean {
