@@ -1,0 +1,1 @@
+/* stub: musl <fortify/fcntl.h> — OHOS fortify wrappers. Not used on Android. */
