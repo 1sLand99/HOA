@@ -36,12 +36,13 @@
 | HAP 原生 .so 加载 | ✅ | DT_NEEDED 链：libace_napi.z.so stub + NDK libc++_shared + libb.so (musl) |
 | 原生 .so C++ 路径解析 | ✅ | `arkui_napi` 仓库 3 处改动：绕过 IsExistedPath、回退 key 匹配、完整路径拼接 |
 | musl ABI bridge (libb.so) | ✅ | 编译 musl thread/stdio/dirent/internal 子集，~195KB，pthread_mutex/printf/fopen/opendir 全链路通过 |
+| sigaction ABI 桥接 | ✅ | musl→kernel 布局转换 + `-Wl,-Bsymbolic` + 运行时 GOT 补丁，TestRaise/TestSigprocmask 通过 |
 | ELF NEEDED 原地 patch | ✅ | `.dynstr` 中 `libc.so` → `libb.so` 原地字符串替换，HapInstaller 安装时自动执行 |
 | errno 委托 bionic | ✅ | `__errno_location()` 通过 dlsym(RTLD_NEXT) 委托 bionic，解决 musl/bionic errno TLS 不一致 |
 | 一键构建 (build_all.sh) | ✅ | ArkUI-X → libb.so → sync → APK，4 个步骤，支持 --skip-arkui/--skip-musl |
 | NAPI 模块导出 | ✅ | `libentry.so` add(2,3)=5 + 34 项 musl 函数测试全部通过 |
 | hilog 日志系统 | ✅ | `libhilog_ndk.z.so` stub + strip_privacy + 转发 Android logcat |
-| native-example 测试 | ✅ | 34 项：pthread/stdio/dirent/mmap/sem/网络/时间/select/stdlib/mprotect/dup3/loopback |
+| native-example 测试 | ✅ | 36 项：pthread/stdio/dirent/mmap/sem/网络/时间/select/stdlib/mprotect/dup3/loopback/signal |
 
 ---
 
@@ -308,6 +309,33 @@ musl 子线程退出时 SIGTRAP 崩溃，backtrace 指向 `validate_self` → `_
 初步分析仅检查了编译源文件对 fortify 的直接 include（结果为 0），遗漏了 musl 系统头文件的**间接引用**。musl 的 `<stdio.h>`、`<stdlib.h>`、`<string.h>`、`<unistd.h>`、`<fcntl.h>`、`<poll.h>`、`<sys/socket.h>`、`<sys/stat.h>` 在 `#ifndef __LITEOS__` 下 include 对应的 `<fortify/xxx.h>`。编译 .c 文件 include 这些系统头文件时，fortify stub 必须存在，否则编译失败。
 
 最终确认需要 8 个 fortify stub（全部保留），与 OHOS SDK fortify 溢出检测机制无关，纯粹是 musl header 的 include 链要求。
+
+### 19. 信号函数 ABI 桥接 — Step 1: sigaction/raise/sigprocmask（2026-05-30）
+
+OHOS HAP .so 调用 `sigaction()` 时，musl 和 bionic 的 `struct sigaction` 布局不兼容——musl 将 `sa_handler` 放在偏移 0（40 字节总长），bionic 将 `sa_flags` 放在偏移 0。直接调用 bionic sigaction 会导致 handler 指针被写入错误偏移，信号永远无法递送。
+
+**三层方案**：
+
+1. **libb.so 内 sigaction bridge**（`signal_bridge.c`）：编译进 libb.so，将 musl 布局的 `hap_sigaction`（40 字节，sa_handler@0）转换为 kernel 布局的 `kernel_sigaction`（32 字节，sa_handler@0），直接通过 `SYS_rt_sigaction` syscall 注册。拒绝 musl 保留信号 32-34（SIGCANCEL/SIGSYNCCALL/SIGTIMER）。
+
+2. **`-Wl,-Bsymbolic`**：libb.so 链接标志，确保 libb.so 内部对 `sigaction` 的引用绑定到自身 bridge，不被 `libsigchain.so` 或其他系统库抢占。
+
+3. **运行时 GOT 补丁**（`got_patch.c` + `elf_patch_jni.c`）：通过 `dl_iterate_phdr` 遍历已加载的 ELF，用 `mprotect` 临时开放写权限，将 HAP .so 的 `.got.plt`（JUMP_SLOT）和 `.got`（GLOB_DAT）中 `sigaction` 条目重写为 libb.so bridge 地址。只 patch 目标 HAP .so（通过 basename 匹配），不修改系统库。
+
+**raise() 信号递送问题**：musl 的 `raise()` 内部调用 `__block_app_sigs` 阻塞信号 1-31 和 33-38（mask `0xfffffffc7fffffff`），然后通过 `tgkill` 发送信号。阻塞的信号在 `__restore_sigs` 恢复掩码后才递送，但延迟递送路径存在 bug——handler 不触发。
+
+**解决方案**：TestRaise 使用信号 39（不在阻塞范围内），信号在 `tgkill` 时立即递送，handler 正常触发。TestSigprocmask 继续使用 SIGUSR1（信号 10），验证 block→raise→pending→unblock→deliver 模式。
+
+**已验证**：`TestRaise=OK raise`（信号 39）、`TestSigprocmask=OK sigprocmask`（SIGUSR1）。
+
+**仓库改动**：
+
+| 仓库 | 改动 | 说明 |
+|------|------|------|
+| HOA `app/src/main/cpp/` | 3 文件 | `signal_bridge.c`（musl→kernel sigaction 转换）、`got_patch.c`（运行时 GOT 补丁）、`elf_patch_jni.c`（JNI 入口 + sigaction GOT patch） |
+| HOA `Makefile.musl_bridge` | 1 文件 | 新增 `MUSL_SIGNAL_C`（10 个 .c）+ `MUSL_SIGNAL_S`（restore.s） |
+| HOA `libb.map` | 1 文件 | 新增 signal 符号导出 |
+| native-example `napi_init.cpp` | 1 文件 | 新增 TestRaise（信号 39）、TestSigprocmask（SIGUSR1） |
 
 ### HDS 组件兼容方案
 

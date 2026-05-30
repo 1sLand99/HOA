@@ -81,6 +81,19 @@
 
         /* JNI */
         Java_app_hackeris_hoa_hap_ElfPatcher_patchSo;
+        Java_app_hackeris_hoa_hap_ElfPatcher_patchGot;
+
+        /* signal — must come from musl to chain through pthread_* */
+        raise;
+        sigaction;
+        sigaddset;
+        sigdelset;
+        sigemptyset;
+        sigfillset;
+        sigismember;
+        sigpending;
+        sigprocmask;
+        kill;
 
     local:
         *;

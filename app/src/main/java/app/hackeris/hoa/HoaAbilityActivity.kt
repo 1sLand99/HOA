@@ -230,6 +230,9 @@ open class HoaAbilityActivity : StageActivity() {
                     iter.remove()
                     progress = true
                     Log.e(TAG, "preloadNativeDeps: loaded ${soFile.name} (pass $pass)")
+                    // Patch GOT entries to redirect sigaction to libb.so bridge
+                    val n = app.hackeris.hoa.hap.ElfPatcher.patchGot(soFile.absolutePath)
+                    if (n > 0) Log.e(TAG, "preloadNativeDeps: patched $n sigaction GOT entries in ${soFile.name}")
                 } catch (_: UnsatisfiedLinkError) {
                     // dep not yet satisfied — retry next pass
                 }

@@ -47,6 +47,7 @@ LDFLAGS := \
     -shared \
     -nostdlib \
     -L$(SYSROOT)/usr/lib/aarch64-linux-android/26 \
+    -Wl,-Bsymbolic \
     -Wl,--allow-shlib-undefined \
     -Wl,--version-script=$(SRCDIR)/libb.map \
     -Wl,--gc-sections \
@@ -56,6 +57,7 @@ LDLIBS := \
     -lc \
     -lm \
     -ldl \
+    -llog \
     $(LLVM)/lib/clang/19/lib/linux/libclang_rt.builtins-aarch64-android.a
 
 ASFLAGS := \
@@ -98,7 +100,23 @@ MUSL_TIME_C := \
     $(MUSL)/src/time/strftime.c
 
 MUSL_SIGNAL_C := \
-    $(MUSL)/src/signal/block.c
+    $(MUSL)/src/signal/block.c \
+    $(MUSL)/src/signal/raise.c \
+    $(MUSL)/src/signal/sigprocmask.c \
+    $(MUSL)/src/signal/kill.c \
+    $(MUSL)/src/signal/sigaddset.c \
+    $(MUSL)/src/signal/sigdelset.c \
+    $(MUSL)/src/signal/sigemptyset.c \
+    $(MUSL)/src/signal/sigfillset.c \
+    $(MUSL)/src/signal/sigismember.c \
+    $(MUSL)/src/signal/sigpending.c
+
+MUSL_SIGNAL_S := \
+    $(MUSL)/src/signal/aarch64/restore.s
+
+# abort_lock.c is in src/exit/ but sigaction.c needs it
+MUSL_ABORT_LOCK := \
+    $(MUSL)/src/exit/abort_lock.c
 
 MUSL_MMAN_C := \
     $(MUSL)/src/mman/mmap.c \
@@ -147,8 +165,8 @@ MUSL_SRCS := $(MUSL_THREAD_C) $(MUSL_STDIO_C) $(MUSL_INTERNAL_C) \
              $(MUSL_TIME_C) $(MUSL_SIGNAL_C) $(MUSL_MMAN_C) \
              $(MUSL_UNISTD_C) $(MUSL_LOCALE_C) $(MUSL_TEMP_C) \
              $(MUSL_STRING_C) $(MUSL_ENV_C) $(MUSL_STDLIB_C) \
-             $(MUSL_NETWORK_C) $(MUSL_SELECT_C)
-MUSL_ASMS := $(MUSL_THREAD_S) $(MUSL_SETJMP_S)
+             $(MUSL_NETWORK_C) $(MUSL_SELECT_C) $(MUSL_ABORT_LOCK)
+MUSL_ASMS := $(MUSL_THREAD_S) $(MUSL_SETJMP_S) $(MUSL_SIGNAL_S)
 
 BRIDGE_SRCS := \
     $(SRCDIR)/pthread_bridge.c \
@@ -156,7 +174,9 @@ BRIDGE_SRCS := \
     $(SRCDIR)/clone_bridge.c \
     $(SRCDIR)/musl_stubs.c \
     $(SRCDIR)/elf_patch.c \
-    $(SRCDIR)/elf_patch_jni.c
+    $(SRCDIR)/elf_patch_jni.c \
+    $(SRCDIR)/signal_bridge.c \
+    $(SRCDIR)/got_patch.c
 
 # ── Object files ──────────────────────────────────────────────────────
 
