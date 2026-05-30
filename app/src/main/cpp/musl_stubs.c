@@ -26,26 +26,8 @@ __attribute__((constructor)) static void __musl_stubs_init(void) {
     __environ = environ;
 }
 
-// ── __thread_list_lock ──────────────────────────────────────────────
-//
-// Used by pthread_create to serialize updates to the thread list.
-// Defined in src/env/__init_tls.c which we can't compile (it handles
-// full TLS bootstrap which bionic owns on Android).
-
-volatile int __thread_list_lock = 0;
-
-// ── __copy_tls ──────────────────────────────────────────────────────
-//
-// Copies the TLS initialization image and returns a pointer past the
-// TCB.  Only called from pthread_create when spawning a new thread.
-// Since our initial phase disallows HAP-created threads, this stub
-// aborts if ever reached.
-
-void *__copy_tls(unsigned char *mem)
-{
-    fprintf(stderr, "FATAL: __copy_tls called — HAP thread creation not supported\n");
-    abort();
-}
+// __thread_list_lock and __copy_tls are now provided by
+// musl's src/env/__init_tls.c which is compiled into libb.so.
 
 // ── MUSL_LOGW ───────────────────────────────────────────────────────
 //

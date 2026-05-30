@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <dlfcn.h>
 #include <sys/syscall.h>
 #include <linux/futex.h>
@@ -83,11 +84,17 @@ void __musl_bridge_register(struct pthread *self)
     unlock_table();
 }
 
-// Unified __pthread_self(): gettid() + table lookup.
+// Unified __pthread_self(): raw gettid syscall + table lookup.
 // On first call from a bionic thread, allocates a musl struct pthread.
+//
+// Uses syscall(SYS_gettid) instead of bionic's gettid() because bionic's
+// gettid() reads the cached tid from bionic's pthread_internal_t via
+// TPIDR_EL0.  Since we strip CLONE_SETTLS to keep bionic's __start_thread
+// working, child threads inherit the parent's TPIDR_EL0 and would get the
+// parent's tid — causing the table lookup to return the wrong pthread.
 struct pthread *__musl_bridge_self(void)
 {
-    pid_t tid = gettid();
+    pid_t tid = (pid_t)syscall(SYS_gettid);
 
     // Lock-free read: table is append-only, self_count is monotonic.
     for (int i = 0; i < self_count; i++) {
@@ -157,9 +164,13 @@ static int *(*bionic_errno_loc)(void);
 
 int *__errno_location(void)
 {
-    if (bionic_errno_loc)
-        return bionic_errno_loc();
-    return &__musl_bridge_self()->errno_val;
+    if (!bionic_errno_loc) {
+        bionic_errno_loc = (int *(*)(void))dlsym(RTLD_NEXT, "__errno_location");
+        if (!bionic_errno_loc) {
+            return &__musl_bridge_self()->errno_val;
+        }
+    }
+    return bionic_errno_loc();
 }
 
 int *___errno_location(void) __attribute__((alias("__errno_location")));
@@ -170,13 +181,19 @@ int *___errno_location(void) __attribute__((alias("__errno_location")));
 // (if (!libc.need_locks) return), making all musl internal locks
 // no-ops — data races in multi-threaded use.
 //
-// struct __libc layout (third_party/musl/src/internal/libc.h):
-//   offset 0: can_do_threads (char)
-//   offset 1: threaded (char)
-//   offset 2: secure (char)
-//   offset 3: need_locks (volatile signed char)
-//   ...
-//   offset 32: global_locale (struct __locale_struct)
+// struct __libc layout from musl src/internal/libc.h (aarch64 LP64):
+//   offset  0: can_do_threads (char)
+//   offset  1: threaded (char)
+//   offset  2: secure (char)
+//   offset  3: need_locks (volatile signed char)
+//   offset  4: threads_minus_1 (int)
+//   offset  8: auxv (size_t *)
+//   offset 16: tls_head (struct tls_module *)
+//   offset 24: tls_size (size_t)
+//   offset 32: tls_align (size_t)
+//   offset 40: tls_cnt (size_t)
+//   offset 48: page_size (size_t)  ← used by ROUND() in pthread_create
+//   offset 56: global_locale (struct __locale_struct)
 //
 // __libc is a BSS symbol defined in musl's src/internal/libc.c.
 extern char __libc;  // struct __libc (in BSS, zero-init by linker)
@@ -184,12 +201,18 @@ extern char __libc;  // struct __libc (in BSS, zero-init by linker)
 __attribute__((constructor))
 static void __musl_bridge_init(void)
 {
-    // Enable musl internal futex-based locking.
-    ((volatile signed char *)&__libc)[3] = 1;
+    // Enable thread creation.
+    ((volatile signed char *)&__libc)[0] = 1;  // can_do_threads
+    ((volatile signed char *)&__libc)[3] = 1;  // need_locks
 
-    // Capture musl's global_locale address (offset 32 in struct __libc).
-    global_locale_ptr = (void *)(&__libc + 32);
+    // Set page_size to 4096. Without this, ROUND() returns 0 and mmap
+    // fails with EINVAL inside pthread_create.
+    *(size_t *)(&__libc + 48) = 4096;
 
-    // Resolve bionic's __errno_location for errno delegation.
-    bionic_errno_loc = (int *(*)(void))dlsym(RTLD_NEXT, "__errno_location");
+    // Set tls_align to 1. With tls_align=0 (BSS), __copy_tls pointer
+    // arithmetic overflows and dereferences garbage → SIGSEGV.
+    *(size_t *)(&__libc + 32) = 1;
+
+    // Capture musl's global_locale address (offset 56).
+    global_locale_ptr = (void *)(&__libc + 56);
 }

@@ -35,8 +35,8 @@ CFLAGS_COMMON := \
     -D__ANDROID__ \
     -D__HISPARK_LINUX__ \
     -D_GNU_SOURCE \
-    -Os \
-    -g0 \
+    -O0 \
+    -g \
     -ffunction-sections \
     -fdata-sections \
     -Wno-unused-parameter \
@@ -65,7 +65,7 @@ ASFLAGS := \
 # ── Source files ──────────────────────────────────────────────────────
 
 MUSL_THREAD_C := $(filter-out %/__unmapself.c %/__tls_get_addr.c %/clone.c %/__set_thread_area.c, $(wildcard $(MUSL)/src/thread/*.c))
-MUSL_THREAD_S := $(wildcard $(MUSL)/src/thread/aarch64/*.s)
+MUSL_THREAD_S := $(filter-out %/clone.s, $(wildcard $(MUSL)/src/thread/aarch64/*.s))
 
 MUSL_STDIO_C := $(filter-out %/__stdio_exit.c, $(wildcard $(MUSL)/src/stdio/*.c))
 
@@ -117,16 +117,20 @@ MUSL_STRING_C := \
     $(MUSL)/src/string/strchrnul.c \
     $(MUSL)/src/string/strverscmp.c
 
+MUSL_ENV_C := \
+    $(MUSL)/src/env/__init_tls.c
+
 MUSL_SRCS := $(MUSL_THREAD_C) $(MUSL_STDIO_C) $(MUSL_INTERNAL_C) \
              $(MUSL_DIRENT_C) $(MUSL_ERRNO_C) $(MUSL_SETJMP_C) \
              $(MUSL_TIME_C) $(MUSL_SIGNAL_C) $(MUSL_MMAN_C) \
              $(MUSL_UNISTD_C) $(MUSL_LOCALE_C) $(MUSL_TEMP_C) \
-             $(MUSL_STRING_C)
+             $(MUSL_STRING_C) $(MUSL_ENV_C)
 MUSL_ASMS := $(MUSL_THREAD_S) $(MUSL_SETJMP_S)
 
 BRIDGE_SRCS := \
     $(SRCDIR)/pthread_bridge.c \
     $(SRCDIR)/malloc_bridge.c \
+    $(SRCDIR)/clone_bridge.c \
     $(SRCDIR)/musl_stubs.c \
     $(SRCDIR)/elf_patch.c \
     $(SRCDIR)/elf_patch_jni.c
