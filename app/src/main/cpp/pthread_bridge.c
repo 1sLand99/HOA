@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <link.h>
+#include <elf.h>
 #include <sys/syscall.h>
 #include <linux/futex.h>
 
@@ -88,6 +90,25 @@ static struct pthread *validate_self(struct pthread *self, pid_t tid, int idx)
     return self;
 }
 static void *global_locale_ptr;  // set by constructor from musl's __libc
+
+// ── libb.so TLS module registration for __thread support ──────────────
+//
+// aarch64 OHOS NDK 默认使用 TLSDESC 模型，不调用 __tls_get_addr。
+// bionic 线程的 __thread 由 linker 的 TLSDESC resolver 开箱支持；
+// musl 线程的 __thread 需要干预 TLSDESC entry（非 GOT 符号 patch）。
+//
+// 以下 TLS 模块注册基础设施预留给后续 musl 线程 TLS 支持：
+// musl 的 __copy_tls() 迭代 libc.tls_head 为新线程拷贝 TLS 镜像，
+// 需要将 HAP .so 的 PT_TLS 注册到此链中。
+//
+// Layout mirrors musl's src/internal/libc.h:struct tls_module.
+struct tls_module {
+    struct tls_module *next;
+    void *image;
+    size_t len, size, align, offset;
+};
+
+static struct tls_module libb_tls_mod;
 
 // musl thread entry calls this after tpidr_el0 is set
 void __musl_bridge_register(struct pthread *self)
@@ -200,6 +221,49 @@ int *__errno_location(void)
 
 int *___errno_location(void) __attribute__((alias("__errno_location")));
 
+extern char __libc;  // struct __libc, defined in musl src/internal/libc.c
+
+// ── Helper: find libb.so's PT_TLS via dl_iterate_phdr ─────────────────
+#define MUSL_FULL_PTHREAD_SIZE 392   // sizeof(struct pthread) on aarch64 LP64
+#define TLS_GAP_ABOVE_TP 16          // aarch64 TLS ABI reserved gap above TP
+
+static int find_libb_tls(struct dl_phdr_info *info, size_t size, void *data)
+{
+    (void)size;
+    (void)data;
+    if (!strstr(info->dlpi_name, "libb.so")) return 0;
+
+    for (int i = 0; i < info->dlpi_phnum; i++) {
+        if (info->dlpi_phdr[i].p_type != PT_TLS) continue;
+
+        const Elf64_Phdr *phdr = &info->dlpi_phdr[i];
+        libb_tls_mod.image = (void *)(info->dlpi_addr + phdr->p_vaddr);
+        libb_tls_mod.len   = phdr->p_filesz;
+        libb_tls_mod.size  = phdr->p_memsz;
+        libb_tls_mod.align = phdr->p_align;
+
+        // Compute offset within the TLS block (same formula as __init_tls.c)
+        libb_tls_mod.offset = TLS_GAP_ABOVE_TP;
+        libb_tls_mod.offset +=
+            (-TLS_GAP_ABOVE_TP + (uintptr_t)libb_tls_mod.image)
+            & (libb_tls_mod.align - 1);
+
+        // Register with musl's TLS module chain so __copy_tls copies
+        // libb.so's TLS image for every new musl-created thread.
+        libb_tls_mod.next = NULL;
+        *(struct tls_module **)(&__libc + 16) = &libb_tls_mod;   // tls_head
+        *(size_t *)(&__libc + 40) = 1;                            // tls_cnt
+
+        // tls_align was set to 1 (conservative).  Use the actual
+        // alignment from libb.so's TLS segment if larger.
+        if (phdr->p_align > *(size_t *)(&__libc + 32))
+            *(size_t *)(&__libc + 32) = phdr->p_align;
+
+        return 1;
+    }
+    return 0;
+}
+
 // Constructor: enable musl internal locking and capture global_locale.
 //
 // Without need_locks=1, musl's __lock() returns immediately
@@ -242,6 +306,11 @@ static void __musl_bridge_init(void)
     // Set tls_align to 1. With tls_align=0 (BSS), __copy_tls pointer
     // arithmetic overflows and dereferences garbage → SIGSEGV.
     *(size_t *)(&__libc + 32) = 1;
+
+    // Register libb.so's own TLS module so __copy_tls copies it for
+    // new musl-created threads.  Without this, __tls_get_addr has no
+    // DTV entries → crash on first __thread access.
+    dl_iterate_phdr(find_libb_tls, NULL);
 
     // Capture musl's global_locale address (offset 56).
     global_locale_ptr = (void *)(&__libc + 56);

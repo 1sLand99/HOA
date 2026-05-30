@@ -124,6 +124,9 @@
         sigsetjmp;
         siglongjmp;
 
+        /* TLS */
+        __tls_get_addr;
+
     local:
         *;
 };

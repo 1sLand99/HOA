@@ -35,7 +35,21 @@ Java_app_hackeris_hoa_hap_ElfPatcher_patchGot(JNIEnv *env, jclass cls, jstring p
     const char *slash = strrchr(cpath, '/');
     const char *basename = slash ? slash + 1 : cpath;
 
-    /* &sigaction resolves to libb.so's bridge via -Wl,-Bsymbolic. */
+    /*
+     * Each target redirects a GOT entry in the HAP .so from the symbol's
+     * default resolution (usually bionic's libc.so) to libb.so's bridge
+     * implementation.  &func resolves to libb.so's own definition via
+     * -Wl,-Bsymbolic.
+     *
+     * sigaction:  musl↔bionic struct sigaction ABI 不同，需经
+     *             signal_bridge.c 做布局转换。
+     *
+     * __tls_get_addr 不在此列：
+     *   aarch64 上 OHOS NDK 默认使用 TLSDESC 模型访问 __thread 变量，
+     *   解析器由 linker 的 TLSDESC resolver 提供，不调用 __tls_get_addr。
+     *   bionic 线程的 __thread 开箱即用（bionic linker 处理 TLSDESC）；
+     *   musl 线程的 __thread 需额外干预 TLSDESC entry 而非 GOT 符号。
+     */
     struct got_target targets[] = {
         { "sigaction", (void *)&sigaction },
     };

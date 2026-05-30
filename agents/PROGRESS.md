@@ -42,7 +42,7 @@
 | 一键构建 (build_all.sh) | ✅ | ArkUI-X → libb.so → sync → APK，4 个步骤，支持 --skip-arkui/--skip-musl |
 | NAPI 模块导出 | ✅ | `libentry.so` add(2,3)=5 + 34 项 musl 函数测试全部通过 |
 | hilog 日志系统 | ✅ | `libhilog_ndk.z.so` stub + strip_privacy + 转发 Android logcat |
-| native-example 测试 | ✅ | 36 项：pthread/stdio/dirent/mmap/sem/网络/时间/select/stdlib/mprotect/dup3/loopback/signal |
+| native-example 测试 | ✅ | 49 项：pthread/stdio/dirent/mmap/sem/网络/时间/select/stdlib/mprotect/dup3/loopback/signal/__thread |
 
 ---
 
@@ -402,6 +402,7 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 | `AceWebBase.<init>` NoSuchMethodException | 无 | 日志噪音，不影响 WebView 功能 |
 | `stage_asset_provider.cpp` read file failed | 无 | 日志噪音，不影响渲染 |
 | `bundleInfo_ is nullptr` | 无 | HOA 未实现完整 Bundle Manager |
+| `__thread` / `_Thread_local` 变量不支持 | HAP C/C++ 代码中的线程局部变量 | ~~clone_bridge 剥离 CLONE_SETTLS~~ **已修正**：OHOS NDK (BiSheng) 和 Android NDK 均默认将 `__thread` 编译为 emutls（`__emutls_get_address`，编译器内置软件 TLS），不依赖 TPIDR_EL0，在主线程开箱即用。TestThreadLocal 已通过验证。musl 子线程的 native TLS（`-fno-emulated-tls` 编译的 TLSDESC）仍需后续干预 TLSDESC entry |
 
 ---
 
