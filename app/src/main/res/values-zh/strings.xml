@@ -70,4 +70,20 @@
     <string name="btn_sort_name">名称</string>
     <string name="btn_sort_time_desc">最近</string>
     <string name="btn_sort_time_asc">最早</string>
+
+    <!-- Menu -->
+    <string name="menu_permissions">权限</string>
+    <string name="dialog_permissions_title">权限管理</string>
+    <string name="dialog_permissions_msg">即将跳转到系统应用设置，请在页面中找到「权限管理」选项，根据需要勾选允许相关权限。</string>
+    <string name="dialog_permissions_go">前往设置</string>
+    <string name="menu_export_logs">导出日志</string>
+
+    <!-- First launch -->
+    <string name="first_launch_title">早期版本提示</string>
+    <string name="first_launch_msg">HOA 目前处于早期开发阶段，仅能较完善地支持部分 HAP，多数功能仍不完善。\n\n如遇到运行问题，可通过菜单导出日志并反馈给开发者。</string>
+    <string name="first_launch_btn">我知道了</string>
+
+    <!-- Log export -->
+    <string name="toast_logs_exporting">正在准备日志文件…</string>
+    <string name="toast_logs_export_failed">日志导出失败: %1$s</string>
 </resources>

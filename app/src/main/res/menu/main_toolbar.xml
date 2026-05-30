@@ -30,4 +30,16 @@
         </menu>
     </item>
 
+    <item
+        android:id="@+id/action_permissions"
+        android:title="@string/menu_permissions"
+        android:icon="@android:drawable/ic_menu_manage"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_export_logs"
+        android:title="@string/menu_export_logs"
+        android:icon="@android:drawable/ic_menu_send"
+        app:showAsAction="never" />
+
 </menu>

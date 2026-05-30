@@ -7,7 +7,9 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
+import android.provider.Settings
+import app.hackeris.hoa.logging.LogCollector
+import app.hackeris.hoa.logging.LogWriter
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
@@ -65,10 +67,23 @@ class MainActivity : AppCompatActivity() {
             openHapPicker()
         }
 
-        Log.e(TAG, "========== HOA MainActivity START ==========")
+        LogWriter.e(TAG, "========== HOA MainActivity START ==========")
 
         // Handle HAP file opened from file manager or shared from another app
         handleIntent(intent)
+
+        // First-launch disclaimer
+        val prefs = getSharedPreferences("hoa_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean("first_launch_done", false)) {
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.first_launch_title))
+                .setMessage(getString(R.string.first_launch_msg))
+                .setCancelable(false)
+                .setPositiveButton(getString(R.string.first_launch_btn)) { _, _ ->
+                    prefs.edit().putBoolean("first_launch_done", true).apply()
+                }
+                .show()
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -92,7 +107,7 @@ class MainActivity : AppCompatActivity() {
             else -> return
         }
         if (uri != null) {
-            Log.e(TAG, "Handling HAP from intent: action=${intent.action} uri=$uri")
+            LogWriter.e(TAG, "Handling HAP from intent: action=${intent.action} uri=$uri")
             previewAndInstallHap(uri)
         }
     }
@@ -135,6 +150,19 @@ class MainActivity : AppCompatActivity() {
             R.id.action_sort_name -> SortMode.NAME
             R.id.action_sort_time_desc -> SortMode.TIME_DESC
             R.id.action_sort_time_asc -> SortMode.TIME_ASC
+            R.id.action_permissions -> {
+                showPermissionsDialog()
+                return true
+            }
+            R.id.action_export_logs -> {
+                Toast.makeText(this, getString(R.string.toast_logs_exporting), Toast.LENGTH_SHORT).show()
+                LogCollector.exportAndShare(this) { error ->
+                    runOnUiThread {
+                        Toast.makeText(this, getString(R.string.toast_logs_export_failed, error), Toast.LENGTH_LONG).show()
+                    }
+                }
+                return true
+            }
             else -> return super.onOptionsItemSelected(item)
         }
         if (newMode != sortMode) {
@@ -234,7 +262,7 @@ class MainActivity : AppCompatActivity() {
                     showInstallPreviewDialog(java.io.File(finalHapPath), config)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "HAP preview failed", e)
+                LogWriter.e(TAG, "HAP preview failed", e)
                 runOnUiThread {
                     Toast.makeText(
                         this, getString(R.string.toast_install_failed_fmt, e.message), Toast.LENGTH_LONG
@@ -318,7 +346,7 @@ class MainActivity : AppCompatActivity() {
                     installButton.text = getString(R.string.btn_install_hap)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "HAP install failed", e)
+                LogWriter.e(TAG, "HAP install failed", e)
                 runOnUiThread {
                     Toast.makeText(
                         this, getString(R.string.toast_install_failed_fmt, e.message), Toast.LENGTH_LONG
@@ -349,10 +377,10 @@ class MainActivity : AppCompatActivity() {
                 .setMessage(getString(R.string.dialog_no_slots_msg, ProcessSlotManager.MAX_SLOTS))
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
-            Log.w(TAG, "All ${ProcessSlotManager.MAX_SLOTS} process slots occupied")
+            LogWriter.w(TAG, "All ${ProcessSlotManager.MAX_SLOTS} process slots occupied")
             return
         }
-        Log.e(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility} slot=$slot")
+        LogWriter.e(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility} slot=$slot")
         val intent = Intent().apply {
             setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
             putExtra("BUNDLE_NAME", hap.bundleName)
@@ -492,6 +520,20 @@ class MainActivity : AppCompatActivity() {
         private fun loadHapIcon(hap: InstalledHap): android.graphics.Bitmap? {
             return HapBundleLoader.loadHapIcon(hap.contentDir, hap.moduleConfig)
         }
+    }
+
+    private fun showPermissionsDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.dialog_permissions_title))
+            .setMessage(getString(R.string.dialog_permissions_msg))
+            .setPositiveButton(getString(R.string.dialog_permissions_go)) { _, _ ->
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     companion object {

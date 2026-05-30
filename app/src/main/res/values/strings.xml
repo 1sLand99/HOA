@@ -69,4 +69,20 @@
     <string name="btn_sort_name">A-Z</string>
     <string name="btn_sort_time_desc">Newest</string>
     <string name="btn_sort_time_asc">Oldest</string>
+
+    <!-- Menu -->
+    <string name="menu_permissions">Permissions</string>
+    <string name="dialog_permissions_title">Permissions</string>
+    <string name="dialog_permissions_msg">You\'ll be taken to the system app settings.\n\nFind the \"Permissions\" section and grant the permissions your HAPs need.</string>
+    <string name="dialog_permissions_go">Go to Settings</string>
+    <string name="menu_export_logs">Export Logs</string>
+
+    <!-- First launch -->
+    <string name="first_launch_title">Early Stage Notice</string>
+    <string name="first_launch_msg">HOA is in early development and currently only supports a limited set of HAPs. Many features are still incomplete.\n\nIf you encounter issues, you can export logs via the menu and share them for feedback.</string>
+    <string name="first_launch_btn">I Understand</string>
+
+    <!-- Log export -->
+    <string name="toast_logs_exporting">Preparing log archive…</string>
+    <string name="toast_logs_export_failed">Log export failed: %1$s</string>
 </resources>

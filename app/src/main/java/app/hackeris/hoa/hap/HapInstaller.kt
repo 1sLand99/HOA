@@ -1,7 +1,7 @@
 package app.hackeris.hoa.hap
 
 import android.content.Context
-import android.util.Log
+import app.hackeris.hoa.logging.LogWriter
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
@@ -105,10 +105,10 @@ class HapInstaller(private val context: Context) {
                 .forEach { soFile ->
                     try {
                         if (!ElfPatcher.patchSo(soFile.absolutePath)) {
-                            Log.w(TAG, "ELF patch skipped or failed: ${soFile.name}")
+                            LogWriter.w(TAG, "ELF patch skipped or failed: ${soFile.name}")
                         }
                     } catch (e: UnsatisfiedLinkError) {
-                        Log.w(TAG, "ELF patch JNI not available, skipping: ${soFile.name}", e)
+                        LogWriter.w(TAG, "ELF patch JNI not available, skipping: ${soFile.name}", e)
                     }
                 }
         }
