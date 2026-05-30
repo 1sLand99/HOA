@@ -303,11 +303,11 @@ musl 子线程退出时 SIGTRAP 崩溃，backtrace 指向 `validate_self` → `_
 
 改 4 个文件：`napi_init.cpp`（-27/+20）、`CMakeLists.txt`（+libhilog_ndk.z.so）、`hilog_stub.c`（新增 101 行）、HOA `jniLibs/`（产物 .so）。
 
-### 18. stub/fortify/ 死代码清理（2026-05-30）
+### 18. stub/fortify/ 为编译必需，非死代码（2026-05-30，修正）
 
-`stub/fortify/` 目录下 8 个空头文件（fcntl.h、poll.h、socket.h、stat.h、stdio.h、stdlib.h、string.h、unistd.h）完全未被使用——grep 所有编译进 libb.so 的 musl 源文件，零引用。fortify 机制是 OHOS 独有的溢出检测（`__fread_chk` 等），需 `-D_FORTIFY_SOURCE` 配合 OHOS SDK 头文件路径触发，Android 上不会走此路径。
+初步分析仅检查了编译源文件对 fortify 的直接 include（结果为 0），遗漏了 musl 系统头文件的**间接引用**。musl 的 `<stdio.h>`、`<stdlib.h>`、`<string.h>`、`<unistd.h>`、`<fcntl.h>`、`<poll.h>`、`<sys/socket.h>`、`<sys/stat.h>` 在 `#ifndef __LITEOS__` 下 include 对应的 `<fortify/xxx.h>`。编译 .c 文件 include 这些系统头文件时，fortify stub 必须存在，否则编译失败。
 
-删除 `stub/fortify/` 目录，`stub/` 下仅保留 `musl_log.h`（被 `pthread_impl.h` 和 `pthread_join.c` 实际 include，编译必需）。
+最终确认需要 8 个 fortify stub（全部保留），与 OHOS SDK fortify 溢出检测机制无关，纯粹是 musl header 的 include 链要求。
 
 ### HDS 组件兼容方案
 
