@@ -163,6 +163,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 return true
             }
+            R.id.action_report_issue -> {
+                showReportIssueDialog()
+                return true
+            }
             else -> return super.onOptionsItemSelected(item)
         }
         if (newMode != sortMode) {
@@ -530,6 +534,25 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = android.net.Uri.parse("package:$packageName")
                 }
+                startActivity(intent)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showReportIssueDialog() {
+        val items = arrayOf(
+            getString(R.string.dialog_report_issue_gitcode),
+            getString(R.string.dialog_report_issue_github)
+        )
+        val urls = arrayOf(
+            "https://gitcode.com/harmony-on-android/HOA/issues",
+            "https://github.com/harmony-on-android/HOA/issues"
+        )
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.dialog_report_issue_title))
+            .setItems(items) { _, which ->
+                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(urls[which]))
                 startActivity(intent)
             }
             .setNegativeButton(android.R.string.cancel, null)

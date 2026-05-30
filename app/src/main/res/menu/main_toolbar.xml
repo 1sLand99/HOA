@@ -42,4 +42,10 @@
         android:icon="@android:drawable/ic_menu_send"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/action_report_issue"
+        android:title="@string/menu_report_issue"
+        android:icon="@android:drawable/ic_menu_report_image"
+        app:showAsAction="never" />
+
 </menu>

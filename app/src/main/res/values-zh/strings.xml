@@ -77,6 +77,10 @@
     <string name="dialog_permissions_msg">即将跳转到系统应用设置，请在页面中找到「权限管理」选项，根据需要勾选允许相关权限。</string>
     <string name="dialog_permissions_go">前往设置</string>
     <string name="menu_export_logs">导出日志</string>
+    <string name="menu_report_issue">问题反馈</string>
+    <string name="dialog_report_issue_title">问题反馈</string>
+    <string name="dialog_report_issue_gitcode">Gitcode</string>
+    <string name="dialog_report_issue_github">GitHub</string>
 
     <!-- First launch -->
     <string name="first_launch_title">早期版本提示</string>

@@ -76,6 +76,10 @@
     <string name="dialog_permissions_msg">You\'ll be taken to the system app settings.\n\nFind the \"Permissions\" section and grant the permissions your HAPs need.</string>
     <string name="dialog_permissions_go">Go to Settings</string>
     <string name="menu_export_logs">Export Logs</string>
+    <string name="menu_report_issue">Report Issue</string>
+    <string name="dialog_report_issue_title">Report Issue</string>
+    <string name="dialog_report_issue_gitcode">Gitcode</string>
+    <string name="dialog_report_issue_github">GitHub</string>
 
     <!-- First launch -->
     <string name="first_launch_title">Early Stage Notice</string>
