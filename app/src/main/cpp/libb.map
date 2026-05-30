@@ -84,16 +84,41 @@
         Java_app_hackeris_hoa_hap_ElfPatcher_patchGot;
 
         /* signal — must come from musl to chain through pthread_* */
+        getitimer;
+        kill;
+        killpg;
+        psiginfo;
+        psignal;
         raise;
+        setitimer;
         sigaction;
         sigaddset;
+        sigaltstack;
+        sigandset;
         sigdelset;
         sigemptyset;
         sigfillset;
+        sighold;
+        sigignore;
+        siginterrupt;
+        sigisemptyset;
         sigismember;
+        sigorset;
+        sigpause;
         sigpending;
         sigprocmask;
-        kill;
+        sigqueue;
+        sigrelse;
+        sigset;
+        sigsuspend;
+        sigtimedwait;
+        sigwait;
+        sigwaitinfo;
+        signal;
+        __sigaction;
+        __libc_sigaction;
+        __libc_current_sigrtmax;
+        __libc_current_sigrtmin;
 
         /* sigsetjmp — musl jmp_buf layout differs from bionic */
         sigsetjmp;

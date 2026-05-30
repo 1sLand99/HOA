@@ -101,17 +101,40 @@ MUSL_TIME_C := \
 
 MUSL_SIGNAL_C := \
     $(MUSL)/src/signal/block.c \
-    $(MUSL)/src/signal/raise.c \
-    $(MUSL)/src/signal/sigprocmask.c \
+    $(MUSL)/src/signal/getitimer.c \
     $(MUSL)/src/signal/kill.c \
+    $(MUSL)/src/signal/killpg.c \
+    $(MUSL)/src/signal/psiginfo.c \
+    $(MUSL)/src/signal/psignal.c \
+    $(MUSL)/src/signal/raise.c \
+    $(MUSL)/src/signal/setitimer.c \
     $(MUSL)/src/signal/sigaddset.c \
+    $(MUSL)/src/signal/sigaltstack.c \
+    $(MUSL)/src/signal/sigandset.c \
     $(MUSL)/src/signal/sigdelset.c \
     $(MUSL)/src/signal/sigemptyset.c \
     $(MUSL)/src/signal/sigfillset.c \
+    $(MUSL)/src/signal/sighold.c \
+    $(MUSL)/src/signal/sigignore.c \
+    $(MUSL)/src/signal/siginterrupt.c \
+    $(MUSL)/src/signal/sigisemptyset.c \
     $(MUSL)/src/signal/sigismember.c \
-    $(MUSL)/src/signal/sigpending.c \
     $(MUSL)/src/signal/siglongjmp.c \
-    $(MUSL)/src/signal/sigsetjmp_tail.c
+    $(MUSL)/src/signal/sigorset.c \
+    $(MUSL)/src/signal/sigpause.c \
+    $(MUSL)/src/signal/sigpending.c \
+    $(MUSL)/src/signal/sigprocmask.c \
+    $(MUSL)/src/signal/sigqueue.c \
+    $(MUSL)/src/signal/sigrelse.c \
+    $(MUSL)/src/signal/sigrtmax.c \
+    $(MUSL)/src/signal/sigrtmin.c \
+    $(MUSL)/src/signal/sigset.c \
+    $(MUSL)/src/signal/sigsetjmp_tail.c \
+    $(MUSL)/src/signal/sigsuspend.c \
+    $(MUSL)/src/signal/sigtimedwait.c \
+    $(MUSL)/src/signal/sigwait.c \
+    $(MUSL)/src/signal/sigwaitinfo.c \
+    $(MUSL)/src/signal/signal.c
 
 MUSL_SIGNAL_S := \
     $(MUSL)/src/signal/aarch64/restore.s \
@@ -140,7 +163,8 @@ MUSL_TEMP_C := \
 
 MUSL_STRING_C := \
     $(MUSL)/src/string/strchrnul.c \
-    $(MUSL)/src/string/strverscmp.c
+    $(MUSL)/src/string/strverscmp.c \
+    $(MUSL)/src/string/strsignal.c
 
 MUSL_ENV_C := \
     $(MUSL)/src/env/__init_tls.c

@@ -90,3 +90,9 @@ int sigaction(int sig, const struct sigaction *restrict act, struct sigaction *r
     }
     return _syscall_ret(r);
 }
+
+/* musl internal aliases — signal.c and siginterrupt.c call these */
+int __sigaction(int sig, const struct sigaction *restrict act, struct sigaction *restrict old)
+    __attribute__((alias("sigaction")));
+int __libc_sigaction(int sig, const struct sigaction *restrict act, struct sigaction *restrict old)
+    __attribute__((alias("sigaction")));
