@@ -68,10 +68,6 @@
         /* errno */
         __errno_location;
         ___errno_location;
-        strerror;
-
-        /* string */
-        strverscmp;
 
         /* malloc bridge entry points */
         __libc_malloc_impl;
