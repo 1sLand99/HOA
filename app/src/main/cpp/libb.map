@@ -60,6 +60,9 @@
         closedir; dirfd; seekdir; telldir; rewinddir;
         scandir; alphasort; versionsort;
 
+        /* string */
+        strsignal;
+
         /* setjmp */
         setjmp; longjmp;
         _setjmp; _longjmp;
@@ -78,6 +81,10 @@
         /* bridge API */
         __musl_bridge_self;
         __musl_bridge_register;
+
+        /* mman */
+        shm_open;
+        shm_unlink;
 
         /* JNI */
         Java_app_hackeris_hoa_hap_ElfPatcher_patchSo;
