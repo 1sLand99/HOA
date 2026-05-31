@@ -26,8 +26,10 @@ class HdcSession(
     @Volatile var connectedKey: String = ""
     @Volatile var peerChannelId: Int = 0
 
-    // Install state
+    // Command handlers
     private val installHandler = HdcInstallHandler(daemon)
+    private val fileHandler = HdcFileHandler(daemon)
+    private val shellHandler = HdcShellHandler(daemon)
 
     override fun run() {
         try {
@@ -97,9 +99,18 @@ class HdcSession(
             CMD_APP_DATA -> installHandler.handleAppData(data, this)
             CMD_APP_FINISH -> installHandler.handleAppFinish(this)
             CMD_APP_UNINSTALL -> installHandler.handleAppUninstall(data, this)
+            CMD_UNITY_EXECUTE -> shellHandler.handleShellCommand(data, this)
+            CMD_FILE_INIT -> fileHandler.handleFileInit(data, this)
+            CMD_FILE_CHECK -> fileHandler.handleFileCheck(data, this)
+            CMD_FILE_DATA -> fileHandler.handleFileData(data, this)
+            CMD_FILE_FINISH -> fileHandler.handleFileFinish(data, this)
             CMD_KERNEL_CHANNEL_CLOSE -> {
-                daemon.log("Channel close requested channelId=$channelId")
-                running = false
+                if (sessionEstablished) {
+                    daemon.log("Channel close requested channelId=$channelId")
+                    running = false
+                } else {
+                    daemon.log("Channel close ack for reset channel, ignoring")
+                }
             }
             else -> {
                 daemon.log("Unknown command $cmd channelId=$channelId")
@@ -169,6 +180,12 @@ class HdcSession(
         CMD_APP_DATA -> "APP_DATA"
         CMD_APP_FINISH -> "APP_FINISH"
         CMD_APP_UNINSTALL -> "APP_UNINSTALL"
+        CMD_UNITY_EXECUTE -> "UNITY_EXECUTE"
+        CMD_FILE_INIT -> "FILE_INIT"
+        CMD_FILE_CHECK -> "FILE_CHECK"
+        CMD_FILE_BEGIN -> "FILE_BEGIN"
+        CMD_FILE_DATA -> "FILE_DATA"
+        CMD_FILE_FINISH -> "FILE_FINISH"
         else -> "UNKNOWN($cmd)"
     }
 
@@ -176,6 +193,15 @@ class HdcSession(
         running = false
         try { socket.close() } catch (_: Exception) {}
         daemon.removeSession(this)
+    }
+
+    /** Reset channel state after a one-shot command completes, keeping the TCP connection alive. */
+    fun resetChannel() {
+        sessionEstablished = false
+        sessionId = 0
+        channelId = 0
+        peerChannelId = 0
+        daemon.log("Channel reset, waiting for next handshake on same connection")
     }
 
     companion object {

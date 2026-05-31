@@ -30,6 +30,14 @@ const val CMD_KERNEL_HANDSHAKE: Int = 1
 const val CMD_KERNEL_CHANNEL_CLOSE: Int = 2
 const val CMD_KERNEL_ECHO: Int = 9
 const val CMD_KERNEL_ECHO_RAW: Int = 10
+const val CMD_UNITY_EXECUTE: Int = 1001
+
+const val CMD_FILE_INIT: Int = 3000
+const val CMD_FILE_CHECK: Int = 3001
+const val CMD_FILE_BEGIN: Int = 3002
+const val CMD_FILE_DATA: Int = 3003
+const val CMD_FILE_FINISH: Int = 3004
+
 const val CMD_APP_CHECK: Int = 3501
 const val CMD_APP_BEGIN: Int = 3502
 const val CMD_APP_DATA: Int = 3503
@@ -327,6 +335,9 @@ data class SessionHandShake(
 }
 
 const val PAYLOAD_PREFIX_RESERVE: Int = 64
+
+/** 8-byte feature flags response to CMD_FILE_CHECK. All zeros = no compression, default buffer. */
+val CMD_FILE_BEGIN_FLAGS: ByteArray = ByteArray(8)
 
 // ── TransferPayload (CMD_APP_DATA prefix) ──────────────────────────────────
 
