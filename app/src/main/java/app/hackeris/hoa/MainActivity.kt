@@ -23,6 +23,8 @@ import androidx.appcompat.widget.SearchView
 import app.hackeris.hoa.hap.HapBundleLoader
 import app.hackeris.hoa.hap.HapInstaller
 import app.hackeris.hoa.hap.InstalledHap
+import app.hackeris.hoa.hdc.DEFAULT_PORT
+import app.hackeris.hoa.hdc.HdcService
 
 enum class SortMode {
     NAME, TIME_DESC, TIME_ASC
@@ -142,6 +144,10 @@ class MainActivity : AppCompatActivity() {
         sortMenu = menu.findItem(R.id.action_sort_menu).subMenu
         sortMenu?.findItem(sortModeToItemId())?.isChecked = true
 
+        // Set initial HDC toggle title
+        val hdcItem = menu.findItem(R.id.action_hdc)
+        hdcItem.setTitle(if (isHdcRunning()) R.string.menu_hdc_stop else R.string.menu_hdc_start)
+
         return true
     }
 
@@ -162,6 +168,10 @@ class MainActivity : AppCompatActivity() {
                 UpdateChecker.check(this) { result ->
                     UpdateChecker.showResult(this, result)
                 }
+                return true
+            }
+            R.id.action_hdc -> {
+                toggleHdc(item)
                 return true
             }
             else -> return super.onOptionsItemSelected(item)
@@ -576,6 +586,66 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun toggleHdc(item: android.view.MenuItem) {
+        if (isHdcRunning()) {
+            stopService(Intent(this, HdcService::class.java))
+            item.setTitle(R.string.menu_hdc_start)
+            Toast.makeText(this, R.string.toast_hdc_stopped, Toast.LENGTH_SHORT).show()
+        } else {
+            showHdcPortDialog { port ->
+                val prefs = getSharedPreferences("hoa_prefs", MODE_PRIVATE)
+                prefs.edit().putInt(HdcService.KEY_PORT, port).apply()
+                val intent = Intent(this, HdcService::class.java)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+                item.setTitle(R.string.menu_hdc_stop)
+                Toast.makeText(this, getString(R.string.toast_hdc_started, port), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showHdcPortDialog(onStart: (Int) -> Unit) {
+        val prefs = getSharedPreferences("hoa_prefs", MODE_PRIVATE)
+        val currentPort = prefs.getInt(HdcService.KEY_PORT, DEFAULT_PORT)
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(currentPort.toString())
+            setSelection(text.length)
+        }
+        val px16 = (16 * resources.displayMetrics.density).toInt()
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(px16, 0, px16, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dialog_hdc_port_title)
+            .setMessage(R.string.dialog_hdc_port_msg)
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val port = input.text.toString().toIntOrNull()
+                if (port != null && port in 1024..65535) {
+                    onStart(port)
+                } else {
+                    Toast.makeText(this, R.string.toast_hdc_invalid_port, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun isHdcRunning(): Boolean {
+        val manager = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+            if (HdcService::class.java.name == service.service.className) {
+                return true
+            }
+        }
+        return false
     }
 
     companion object {

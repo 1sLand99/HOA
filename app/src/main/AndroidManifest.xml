@@ -57,6 +57,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.NFC" />
 
     <application
@@ -210,6 +211,11 @@
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
             android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <service
+            android:name=".hdc.HdcService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse" />
 
     </application>
 

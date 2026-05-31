@@ -94,6 +94,17 @@
     <string name="update_dialog_uptodate">You are on the latest version.</string>
     <string name="update_check_failed">Check failed: %1$s</string>
 
+    <!-- HDC debug -->
+    <string name="menu_hdc_start">Start HDC Debug</string>
+    <string name="menu_hdc_stop">Stop HDC Debug</string>
+    <string name="toast_hdc_started">HDC daemon started on port %1$d</string>
+    <string name="toast_hdc_stopped">HDC daemon stopped</string>
+    <string name="toast_hdc_already_running">HDC daemon is already running</string>
+    <string name="toast_hdc_install_success">Installed %1$s</string>
+    <string name="dialog_hdc_port_title">HDC Port</string>
+    <string name="dialog_hdc_port_msg">Enter the TCP port for HDC daemon (1024–65535)</string>
+    <string name="toast_hdc_invalid_port">Invalid port (1024–65535)</string>
+
     <!-- Log export -->
     <string name="toast_logs_exporting">Preparing log archive…</string>
     <string name="toast_logs_exported">Logs Exported</string>

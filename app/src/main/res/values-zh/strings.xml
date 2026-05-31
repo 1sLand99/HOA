@@ -78,6 +78,8 @@
     <string name="dialog_permissions_go">前往设置</string>
     <string name="menu_feedback">反馈</string>
     <string name="menu_check_update">检查更新</string>
+    <string name="menu_hdc_start">启动 HDC 调试</string>
+    <string name="menu_hdc_stop">停止 HDC 调试</string>
     <string name="dialog_feedback_title">反馈</string>
     <string name="dialog_feedback_export_logs">导出日志</string>
     <string name="dialog_feedback_gitcode">Gitcode Issues</string>
@@ -100,4 +102,13 @@
     <string name="toast_logs_exported">日志已导出</string>
     <string name="dialog_share">分享</string>
     <string name="toast_logs_export_failed">日志导出失败: %1$s</string>
+
+    <!-- HDC debug -->
+    <string name="toast_hdc_started">HDC 守护进程已启动，端口 %1$d</string>
+    <string name="toast_hdc_stopped">HDC 守护进程已停止</string>
+    <string name="toast_hdc_already_running">HDC 守护进程已在运行</string>
+    <string name="toast_hdc_install_success">已安装 %1$s</string>
+    <string name="dialog_hdc_port_title">HDC 端口</string>
+    <string name="dialog_hdc_port_msg">输入 HDC 守护进程的 TCP 端口 (1024–65535)</string>
+    <string name="toast_hdc_invalid_port">无效的端口号 (1024–65535)</string>
 </resources>

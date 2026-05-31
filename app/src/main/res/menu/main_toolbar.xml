@@ -48,4 +48,10 @@
         android:icon="@android:drawable/ic_menu_info_details"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/action_hdc"
+        android:title="@string/menu_hdc_start"
+        android:icon="@android:drawable/ic_menu_share"
+        app:showAsAction="never" />
+
 </menu>
