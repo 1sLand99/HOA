@@ -26,21 +26,31 @@ object UpdateChecker {
     fun check(context: Context, onResult: (Result) -> Unit) {
         Thread {
             val result: Result = try {
-                val currentDate = parseVersionDate(context)
-                if (currentDate == null) {
-                    Result.Error("Cannot parse version date")
+                val info = context.packageManager.getPackageInfo(context.packageName, 0)
+                @Suppress("DEPRECATION")
+                val localCode = info.versionCode
+                val localName = info.versionName
+
+                val latest = fetchLatestRelease()
+                if (latest == null) {
+                    Result.Error("Cannot fetch release info")
                 } else {
-                    val latestDate = fetchLatestReleaseDate()
-                    if (latestDate == null) {
-                        Result.Error("Cannot fetch release info")
+                    LogWriter.i(TAG, "Local: $localName (code=$localCode), latest: ${latest.name} (code=${latest.versionCode})")
+
+                    val hasUpdate = if (latest.versionCode != null) {
+                        latest.versionCode > localCode
                     } else {
-                        LogWriter.i(TAG, "Current: $currentDate, latest: $latestDate")
-                        if (latestDate.after(currentDate)) {
-                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(latestDate)
-                            Result.UpdateAvailable(dateStr)
-                        } else {
-                            Result.UpToDate
-                        }
+                        val currentDate = parseVersionDate(localName)
+                        currentDate != null && latest.date != null && latest.date.after(currentDate)
+                    }
+
+                    if (hasUpdate) {
+                        val dateStr = latest.date?.let {
+                            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(it)
+                        } ?: latest.name
+                        Result.UpdateAvailable(dateStr)
+                    } else {
+                        Result.UpToDate
                     }
                 }
             } catch (e: Exception) {
@@ -83,24 +93,15 @@ object UpdateChecker {
         }
     }
 
-    private fun parseVersionDate(context: Context): java.util.Date? {
-        return try {
-            val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            val parts = info.versionName.split(".")
-            if (parts.size < 3) return null
-            val year = 2000 + parts[0].toInt()
-            val month = parts[1].toInt()
-            val day = parts[2].toInt()
-            SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(
-                "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private data class ReleaseInfo(
+        val name: String,
+        val versionCode: Int?,
+        val date: java.util.Date?
+    )
 
-    private fun fetchLatestReleaseDate(): java.util.Date? {
+    private fun fetchLatestRelease(): ReleaseInfo? {
         return try {
+            val dateParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
             val conn = URL(RELEASES_URL).openConnection() as HttpURLConnection
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
@@ -118,12 +119,56 @@ object UpdateChecker {
             val releases = JSONArray(body)
             if (releases.length() == 0) return null
 
-            val latest = releases.getJSONObject(0)
-            val dateStr = latest.optString("published_at")
-                .ifEmpty { latest.optString("created_at").ifEmpty { return null } }
-                .take(19)
+            val list = mutableListOf<ReleaseInfo>()
+            for (i in 0 until releases.length()) {
+                val obj = releases.getJSONObject(i)
+                val name = obj.optString("name").ifEmpty {
+                    obj.optString("tag_name")
+                }
+                if (name.isEmpty()) continue
+                val dateStr = (obj.optString("published_at").ifEmpty {
+                    obj.optString("created_at")
+                }).take(19)
+                val date = dateParser.parse(dateStr) ?: continue
+                val code = parseVersionCode(name)
+                list.add(ReleaseInfo(name = name, versionCode = code, date = date))
+            }
 
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).parse(dateStr)
+            if (list.isEmpty()) return null
+
+            list.sortByDescending { it.date }
+            list[0]
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // Parse versionName "YY.M.D.B" → versionCode (YYMMDDBB).
+    // Returns null if the string doesn't match the expected format.
+    private fun parseVersionCode(versionName: String): Int? {
+        return try {
+            val parts = versionName.split(".")
+            if (parts.size < 4) return null
+            val yy = parts[0].toInt()
+            val mm = parts[1].toInt()
+            val dd = parts[2].toInt()
+            val bb = parts[3].toInt()
+            yy * 10000000 + mm * 100000 + dd * 1000 + bb
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun parseVersionDate(versionName: String): java.util.Date? {
+        return try {
+            val parts = versionName.split(".")
+            if (parts.size < 3) return null
+            val year = 2000 + parts[0].toInt()
+            val month = parts[1].toInt()
+            val day = parts[2].toInt()
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(
+                "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
+            )
         } catch (_: Exception) {
             null
         }
