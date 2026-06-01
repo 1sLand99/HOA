@@ -213,9 +213,22 @@ open class HoaAbilityActivity : StageActivity() {
             return
         }
 
-        // Multi-pass topological load.  A single pass fails when libA
-        // (which NEEDED libB) is tried before libB.  Retry until no
-        // progress is made, so chains like A→B→C resolve correctly.
+        // Patch every .so's RUNPATH to "$ORIGIN" so that the linker
+        // resolves DT_NEEDED dependencies from the same directory.
+        // The HarmonyOS toolchain bakes in build-machine paths that
+        // don't exist on Android.  This is a runtime fix applied to
+        // the extracted files — the HAP itself is never modified.
+        for (soFile in soFiles) {
+            val patched = app.hackeris.hoa.hap.ElfPatcher.patchRunpath(soFile.absolutePath)
+            if (patched) {
+                Log.e(TAG, "preloadNativeDeps: RUNPATH→\$ORIGIN ${soFile.name}")
+            }
+        }
+
+        // With RUNPATH=$ORIGIN the linker can walk DT_NEEDED chains
+        // transitively, so topological order no longer matters.
+        // Still do multi-pass for robustness in case some .so files
+        // have non-trivial dependency shapes.
         Log.e(TAG, "preloadNativeDeps: found ${soFiles.size} .so file(s)")
         var remaining = soFiles.toMutableList()
         var pass = 0
@@ -225,16 +238,16 @@ open class HoaAbilityActivity : StageActivity() {
             val iter = remaining.iterator()
             while (iter.hasNext()) {
                 val soFile = iter.next()
-                try {
-                    System.load(soFile.absolutePath)
+                val ret = app.hackeris.hoa.hap.ElfPatcher.nativeLoad(soFile.absolutePath)
+                if (ret == 0) {
                     iter.remove()
                     progress = true
                     Log.e(TAG, "preloadNativeDeps: loaded ${soFile.name} (pass $pass)")
                     // Patch GOT entries to redirect sigaction to libb.so bridge
                     val n = app.hackeris.hoa.hap.ElfPatcher.patchGot(soFile.absolutePath)
                     if (n > 0) Log.e(TAG, "preloadNativeDeps: patched $n sigaction GOT entries in ${soFile.name}")
-                } catch (_: UnsatisfiedLinkError) {
-                    // dep not yet satisfied — retry next pass
+                } else {
+                    Log.w(TAG, "preloadNativeDeps: FAILED ${soFile.name} (nativeLoad returned $ret)")
                 }
             }
             if (!progress) break

@@ -69,3 +69,35 @@ void *__get_vdso_addr(const char *vername, const char *name)
 }
 
 void __get_vdso_info(void) {}
+
+// ── __assert_fail ────────────────────────────────────────────────────
+//
+// musl's assert() macro calls __assert_fail(), but bionic uses
+// __assert() / __assert2().  Provide a bridge so OHOS-built .so files
+// (including libc++_shared.so) can resolve this symbol.
+//
+// The musl signature is:
+//   _Noreturn void __assert_fail(const char *expr, const char *file,
+//                                 int line, const char *func);
+
+#include <android/log.h>
+
+void __assert_fail(const char *expr, const char *file, int line,
+                   const char *func)
+{
+    __android_log_print(ANDROID_LOG_FATAL, "HOA-BRIDGE",
+        "__assert_fail: %s:%d: %s: assertion \"%s\" failed",
+        file ? file : "?", line,
+        func ? func : "?", expr ? expr : "?");
+    abort();
+}
+
+// ── bcmp ────────────────────────────────────────────────────────────
+//
+// BSD byte-compare function present in musl but not in bionic (which
+// only provides memcmp).  OHOS libc++_shared.so references it.
+
+int bcmp(const void *s1, const void *s2, size_t n)
+{
+    return memcmp(s1, s2, n);
+}

@@ -101,3 +101,90 @@ fail:
     munmap(map, st.st_size);
     return -1;
 }
+
+// elf_patch_runpath_to_origin(path)
+//
+// Overwrite DT_RUNPATH (and DT_RPATH if present) with "$ORIGIN" so that
+// the linker resolves DT_NEEDED dependencies from the same directory as
+// the loading .so, rather than the OHOS build-machine path baked in by
+// the HarmonyOS toolchain.
+//
+// "$ORIGIN" is 8 bytes (including NUL).  The existing RUNPATH string is
+// always longer (typically a build-machine absolute path), so we can
+// overwrite in place without growing any section.
+//
+// Returns 0 on success (or if no RUNPATH/RPATH present), -1 on error.
+
+int elf_patch_runpath_to_origin(const char *path)
+{
+    int fd = open(path, O_RDWR);
+    if (fd < 0) return -1;
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) { close(fd); return -1; }
+
+    void *map = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE,
+                     MAP_SHARED, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) return -1;
+
+    if (st.st_size < (off_t)sizeof(Elf64_Ehdr)) goto fail2;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)map;
+    if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) goto fail2;
+    if (ehdr->e_ident[EI_CLASS] != ELFCLASS64) goto fail2;
+
+    Elf64_Phdr *phdr = (Elf64_Phdr *)((char *)map + ehdr->e_phoff);
+    Elf64_Off dyn_offset = 0;
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_DYNAMIC) {
+            dyn_offset = phdr[i].p_offset;
+            break;
+        }
+    }
+    if (dyn_offset == 0) goto fail2;
+
+    Elf64_Dyn *dyn = (Elf64_Dyn *)((char *)map + dyn_offset);
+
+    // Find .dynstr
+    const char *dynstr = NULL;
+    for (Elf64_Dyn *d = dyn; d->d_tag != DT_NULL; d++) {
+        if (d->d_tag == DT_STRTAB) {
+            int found = 0;
+            for (int i = 0; i < ehdr->e_phnum; i++) {
+                if (phdr[i].p_type == PT_LOAD &&
+                    d->d_un.d_val >= phdr[i].p_vaddr &&
+                    d->d_un.d_val < phdr[i].p_vaddr + phdr[i].p_filesz) {
+                    dynstr = (const char *)map + phdr[i].p_offset
+                             + (d->d_un.d_val - phdr[i].p_vaddr);
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) goto fail2;
+            break;
+        }
+    }
+    if (dynstr == NULL) goto fail2;
+
+    int patched = 0;
+
+    for (Elf64_Dyn *d = dyn; d->d_tag != DT_NULL; d++) {
+        if (d->d_tag == DT_RUNPATH) {
+            memcpy((char *)dynstr + d->d_un.d_val, "$ORIGIN", 8);
+            patched = 1;
+        }
+        // Also clear DT_RPATH if present, so RUNPATH takes effect
+        // even when the executable has an RPATH.
+        if (d->d_tag == DT_RPATH) {
+            memcpy((char *)dynstr + d->d_un.d_val, "$ORIGIN", 8);
+            patched = 1;
+        }
+    }
+
+    munmap(map, st.st_size);
+    return patched ? 0 : -1;
+
+fail2:
+    munmap(map, st.st_size);
+    return -1;
+}

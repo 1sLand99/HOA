@@ -89,6 +89,8 @@
         /* JNI */
         Java_app_hackeris_hoa_hap_ElfPatcher_patchSo;
         Java_app_hackeris_hoa_hap_ElfPatcher_patchGot;
+        Java_app_hackeris_hoa_hap_ElfPatcher_nativeLoad;
+        Java_app_hackeris_hoa_hap_ElfPatcher_patchRunpath;
 
         /* signal — must come from musl to chain through pthread_* */
         getitimer;
@@ -133,6 +135,10 @@
 
         /* TLS */
         __tls_get_addr;
+
+        /* musl libc ABI symbols not in bionic */
+        __assert_fail;
+        bcmp;
 
     local:
         *;
