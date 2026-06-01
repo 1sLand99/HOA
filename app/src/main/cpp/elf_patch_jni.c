@@ -14,6 +14,7 @@ int elf_patch_libc_to_libb(const char *path);
 int elf_patch_got_signal(const char *so_basename,
                           const struct got_target *targets, int ntargets);
 int elf_patch_runpath_to_origin(const char *path);
+int elf_load_with_deps(const char *path);
 
 JNIEXPORT jboolean JNICALL
 Java_app_hackeris_hoa_hap_ElfPatcher_patchSo(JNIEnv *env, jclass cls, jstring path)
@@ -66,13 +67,16 @@ Java_app_hackeris_hoa_hap_ElfPatcher_patchGot(JNIEnv *env, jclass cls, jstring p
 }
 
 /*
- * Load a shared library via direct dlopen() from native code with
- * RTLD_GLOBAL.  This bypasses the Android classloader namespace (clns)
- * and loads into the default namespace where symbol visibility between
- * DT_NEEDED dependencies works correctly.
+ * Load a shared library via dlopen() with topological dependency
+ * resolution.  DT_NEEDED dependencies that exist as files in the same
+ * directory are recursively loaded first, then the target is loaded
+ * with RTLD_GLOBAL.
  *
- * Returns 0 on success, -1 on failure.  Error message is logged and
- * also returned via JNI layer.
+ * This bypasses the Android classloader namespace (clns) and loads
+ * into the default namespace where RTLD_GLOBAL symbol visibility
+ * between DT_NEEDED dependencies works correctly.
+ *
+ * Returns 0 on success, -1 on failure.
  */
 JNIEXPORT jint JNICALL
 Java_app_hackeris_hoa_hap_ElfPatcher_nativeLoad(JNIEnv *env, jclass cls, jstring path)
@@ -81,19 +85,10 @@ Java_app_hackeris_hoa_hap_ElfPatcher_nativeLoad(JNIEnv *env, jclass cls, jstring
     const char *cpath = (*env)->GetStringUTFChars(env, path, NULL);
     if (cpath == NULL) return -1;
 
-    void *handle = dlopen(cpath, RTLD_NOW | RTLD_GLOBAL);
-    if (handle == NULL) {
-        const char *err = dlerror();
-        __android_log_print(ANDROID_LOG_WARN, "BRIDGE-LOAD",
-                            "dlopen(%s): %s", cpath, err ? err : "unknown error");
-        (*env)->ReleaseStringUTFChars(env, path, cpath);
-        return -1;
-    }
+    int ret = elf_load_with_deps(cpath);
 
-    __android_log_print(ANDROID_LOG_INFO, "BRIDGE-LOAD",
-                        "dlopen(%s) OK (RTLD_GLOBAL)", cpath);
     (*env)->ReleaseStringUTFChars(env, path, cpath);
-    return 0;
+    return ret;
 }
 
 /*

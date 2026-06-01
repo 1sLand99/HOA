@@ -204,8 +204,9 @@ open class HoaAbilityActivity : StageActivity() {
             return
         }
 
+        val nativeAbi = android.os.Build.SUPPORTED_ABIS[0]
         val soFiles = libsDir.walkTopDown()
-            .filter { it.isFile && it.extension == "so" }
+            .filter { it.isFile && it.extension == "so" && it.parentFile?.name == nativeAbi }
             .toList()
 
         if (soFiles.isEmpty()) {
@@ -213,11 +214,9 @@ open class HoaAbilityActivity : StageActivity() {
             return
         }
 
-        // Patch every .so's RUNPATH to "$ORIGIN" so that the linker
-        // resolves DT_NEEDED dependencies from the same directory.
-        // The HarmonyOS toolchain bakes in build-machine paths that
-        // don't exist on Android.  This is a runtime fix applied to
-        // the extracted files — the HAP itself is never modified.
+        // Patch every .so's RUNPATH to "$ORIGIN" as a best-effort fix.
+        // HAPs built without RUNPATH (CMAKE_SKIP_RPATH TRUE) have none;
+        // topological dependency loading in nativeLoad handles those.
         for (soFile in soFiles) {
             val patched = app.hackeris.hoa.hap.ElfPatcher.patchRunpath(soFile.absolutePath)
             if (patched) {
