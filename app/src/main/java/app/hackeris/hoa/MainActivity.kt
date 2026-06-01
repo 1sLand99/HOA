@@ -14,6 +14,9 @@ import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.widget.Button
 import android.widget.ListView
 import android.widget.TextView
@@ -44,6 +47,12 @@ class MainActivity : AppCompatActivity() {
     private var installedHaps = listOf<InstalledHap>()
     private var sortMode = SortMode.TIME_ASC
     private var searchQuery = ""
+
+    private val hapInstallReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshHapList()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,6 +95,13 @@ class MainActivity : AppCompatActivity() {
                 }
                 .show()
         }
+
+        registerReceiver(hapInstallReceiver, IntentFilter("app.hackeris.hoa.HAP_INSTALLED"))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try { unregisterReceiver(hapInstallReceiver) } catch (_: Exception) {}
     }
 
     override fun onNewIntent(intent: Intent?) {

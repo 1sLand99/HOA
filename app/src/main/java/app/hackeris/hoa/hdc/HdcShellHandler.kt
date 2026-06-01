@@ -6,7 +6,11 @@ import java.io.InputStream
 class HdcShellHandler(private val daemon: HdcDaemon) {
 
     fun handleShellCommand(data: ByteArray, session: HdcSession) {
-        val command = String(data, Charsets.UTF_8).trim()
+        var command = String(data, Charsets.UTF_8).trim()
+        // hdc client wraps the shell command in quotes; strip them
+        if (command.startsWith("\"") && command.endsWith("\"")) {
+            command = command.substring(1, command.length - 1)
+        }
         daemon.log("CMD_UNITY_EXECUTE: command=$command")
 
         if (command.isEmpty()) {
@@ -86,6 +90,22 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
                 "const.os.distributedsupport" -> "false"
                 "const.telephony.enabled" -> "false"
                 "const.wifi.direct.network.type" -> "0"
+                "const.debuggable" -> "1"
+                "const.hdc.version" -> "Ver: 3.2.0c-HOA"
+                "const.hdc.secure" -> "0"
+                "const.boot.oemmode" -> "rd"
+                "const.pc_security.fileguard_force_enable" -> "false"
+                "persist.hdc.root" -> "0"
+                "persist.hdc.port" -> "8710"
+                "persist.hdc.mode" -> "tcp"
+                "persist.hdc.auth_bypass" -> "1"
+                "persist.hdc.control.shell" -> "true"
+                "persist.hdc.control.file" -> "true"
+                "persist.hdc.control.fport" -> "true"
+                "persist.hdc.version" -> "3.2.0c-HOA"
+                "persist.hdc.control.enterprise_connect_validation" -> "false"
+                "persist.hdc.daemon.auth_result" -> "SUCCESS"
+                "persist.hdc.jdwp" -> ""
                 "ohos.qemu.hvd.name" -> ""
                 "persist.sys.hilog.fullname" -> "HarmonyOS-6.1.0.100"
                 "persist.sys.hilog.version" -> "6.1.0.100"
@@ -140,7 +160,10 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
                 val ctx = daemon.getApplicationContext()
                 if (ctx != null) {
                     val installed = app.hackeris.hoa.hap.HapInstaller(ctx).install(hapPath)
-                    "[Success] installed ${installed.bundleName}/${installed.mainAbility}"
+                    // OHOS uses MSG_OK (no prefix) for success and MSG_FAIL ("[Fail]") for errors.
+                    // DevEco Studio parses these prefixes to determine install outcome.
+                    ctx.sendBroadcast(android.content.Intent("app.hackeris.hoa.HAP_INSTALLED"))
+                    "install bundle successfully."
                 } else {
                     "[Fail] no application context"
                 }
@@ -161,7 +184,8 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
                 val ctx = daemon.getApplicationContext()
                 if (ctx != null) {
                     app.hackeris.hoa.hap.HapInstaller(ctx).uninstall(packageName)
-                    "[Success] uninstalled $packageName"
+                    ctx.sendBroadcast(android.content.Intent("app.hackeris.hoa.HAP_INSTALLED"))
+                    "uninstall bundle successfully."
                 } else {
                     "[Fail] no application context"
                 }
@@ -178,12 +202,33 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
             execAndroid(arrayOf("am", "force-stop", pkg))
             return ""
         }
-        val aaStart = Regex("^aa start -a (\\S+)")
+        val aaStart = Regex("^aa start\\s+-a\\s+(\\S+)\\s+-b\\s+(\\S+)\\s+-m\\s+(\\S+)")
         aaStart.find(command)?.let { match ->
             val ability = match.groupValues[1]
-            daemon.log("aa start: $command")
-            // Not actually starting, just return success
-            return ""
+            val bundle = match.groupValues[2]
+            val module = match.groupValues[3]
+            daemon.log("aa start: ability=$ability bundle=$bundle module=$module")
+            return try {
+                val ctx = daemon.getApplicationContext() ?: return "[Fail] no application context"
+                val slot = app.hackeris.hoa.ProcessSlotManager.allocateSlot(ctx)
+                if (slot < 0) return "[Fail] no available process slots"
+                val intent = android.content.Intent().apply {
+                    setClassName(ctx.packageName, "${ctx.packageName}.HoaAbilityActivity$slot")
+                    putExtra("BUNDLE_NAME", bundle)
+                    putExtra("MODULE_NAME", module)
+                    putExtra("ABILITY_NAME", ability)
+                    putExtra("PROCESS_SLOT", slot)
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                             android.content.Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
+                             android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                }
+                ctx.startActivity(intent)
+                daemon.log("aa start: launched slot=$slot")
+                "start ability successfully."
+            } catch (e: Exception) {
+                daemon.log("aa start failed: ${e.message}")
+                "[Fail] ${e.message}"
+            }
         }
 
         // mkdir /data/local/tmp/... → remap to app cache (with or without -p)
@@ -209,10 +254,16 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
             return ""
         }
 
+        // pgrep — not available on Android, mock for DevEco Studio
+        if (command.startsWith("pgrep ")) return ""
+        // pidof — not available on Android, mock for DevEco Studio
+        if (command.startsWith("pidof ")) return ""
+
         return null  // not mocked, execute normally
     }
 
     private fun finishCommand(session: HdcSession) {
+        // OHOS TaskFinish sends [1], host decrements to [0] and sends back as ack
         session.sendPacket(CMD_KERNEL_CHANNEL_CLOSE, byteArrayOf(1))
         session.resetChannel()
     }

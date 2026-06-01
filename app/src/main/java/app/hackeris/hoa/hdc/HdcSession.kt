@@ -54,11 +54,31 @@ class HdcSession(
                 while (offset < bufLen) {
                     val pkt = parsePacket(buffer, offset, bufLen - offset)
                     if (pkt == null) {
-                        // Incomplete packet; move remainder to front
-                        if (offset > 0) {
-                            System.arraycopy(buffer, offset, buffer, 0, bufLen - offset)
-                            bufLen -= offset
+                        if (offset == 0 && bufLen > 2) {
+                            // Check if buffer starts with a plausible HDC header.
+                            // If HW flags are present, the packet may just be
+                            // incomplete (wait for more data). Only sync-recover
+                            // when the header is clearly garbage.
+                            val hasHW = buffer[offset] == PACKET_FLAG_H && buffer[offset + 1] == PACKET_FLAG_W
+                            if (!hasHW) {
+                                val headHex = buffer.copyOfRange(0, minOf(32, bufLen)).joinToString(" ") { "%02x".format(it) }
+                                daemon.log("Sync recover: no HW at start, bufLen=$bufLen head=[$headHex]")
+                                val sync = findHwSync(buffer, 1, bufLen)
+                                if (sync > 0) {
+                                    System.arraycopy(buffer, sync, buffer, 0, bufLen - sync)
+                                    bufLen -= sync
+                                    daemon.log("Sync recover: skipped $sync garbage bytes, remaining=$bufLen")
+                                    continue
+                                }
+                                // No HW anywhere — clear and wait for a fresh packet
+                                daemon.log("Sync recover: no HW in $bufLen bytes, clearing")
+                                bufLen = 0
+                            }
+                            // HW at position 0: valid header, packet incomplete
                         }
+                        // Compaction (if any) is handled after the while loop.
+                        // Doing it here too causes a double-compaction bug that
+                        // discards partial packets when offset > 0.
                         break
                     }
                     val (head, protect, data) = pkt
@@ -133,13 +153,17 @@ class HdcSession(
 
         daemon.log("Session handshake: banner=${hs.banner} authType=${hs.authType} connectKey=${hs.connectKey} version=${hs.version}")
 
-        // Reply with our session info; set authType=5 (AUTH_OK) to bypass auth
+        // Reply with session info; authType=4 (AUTH_OK) bypasses auth.
+        // buf is used as the device name in 'list targets -v' output.
+        val buf = try {
+            java.net.InetAddress.getLocalHost().hostName ?: "HOA-01"
+        } catch (_: Exception) { "HOA-01" }
         val reply = SessionHandShake(
             banner = BANNER,
             authType = 4,   // AUTH_OK
             sessionId = sessionId,
             connectKey = connectedKey,
-            buf = "OK",
+            buf = buf,
             version = daemon.version
         )
         sendPacket(CMD_KERNEL_HANDSHAKE, reply.toBytes())
@@ -211,5 +235,15 @@ class HdcSession(
 
     companion object {
         private const val TAG = "HOA.HDC.Session"
+
+        /** Scan buffer for 'H' 'W' header bytes. Returns index or -1. */
+        private fun findHwSync(buf: ByteArray, start: Int, end: Int): Int {
+            var i = start
+            while (i < end - 1) {
+                if (buf[i] == PACKET_FLAG_H && buf[i + 1] == PACKET_FLAG_W) return i
+                i++
+            }
+            return -1
+        }
     }
 }
