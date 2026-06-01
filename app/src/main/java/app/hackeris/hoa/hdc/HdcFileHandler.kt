@@ -63,7 +63,9 @@ class HdcFileHandler(private val daemon: HdcDaemon) {
             Pair(path, FileTransferState(dstPath = path))
         }
 
-        val finalPath = if (outPath.isNotEmpty()) outPath else {
+        val finalPath = if (outPath.isNotEmpty()) {
+            if (config.optionalName.isNotEmpty()) "$outPath/${config.optionalName}" else outPath
+        } else {
             val tempDir = daemon.getApplicationContext()?.cacheDir?.absolutePath
                 ?: "/data/local/tmp"
             "$tempDir/${config.optionalName}"

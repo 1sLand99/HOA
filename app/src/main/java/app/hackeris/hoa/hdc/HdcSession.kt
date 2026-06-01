@@ -16,7 +16,7 @@ class HdcSession(
 
     private val input = BufferedInputStream(socket.getInputStream(), 65536)
     private val output = BufferedOutputStream(socket.getOutputStream(), 65536)
-    private val buffer = ByteArray(1048576) // 1 MB ring buffer
+    private val buffer = ByteArray(4194304) // 4 MB ring buffer
     private var bufLen = 0
 
     @Volatile var running = true
@@ -38,6 +38,11 @@ class HdcSession(
                 val n = input.read(buffer, bufLen, buffer.size - bufLen)
                 if (n < 0) {
                     daemon.log("Connection closed by peer channelId=$channelId")
+                    break
+                }
+                if (n == 0 && bufLen == buffer.size) {
+                    daemon.log("Buffer full ($bufLen bytes), no complete packet. Dumping head: ${buffer.copyOfRange(0, 32).joinToString(",") { "%02x".format(it) }}")
+                    running = false
                     break
                 }
                 bufLen += n
