@@ -26,6 +26,7 @@ app/libs/*.jar
 app/libs/*.aar
 *.so
 *.o
+*.apk
 app/src/main/cpp/obj/
 
 third_party/build_android
