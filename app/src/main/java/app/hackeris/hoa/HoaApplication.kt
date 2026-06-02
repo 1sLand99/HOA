@@ -83,6 +83,16 @@ class HoaApplication : StageApplication() {
             LogWriter.e(TAG, "System.loadLibrary(\"hms_security\") — FAILED", e)
         }
 
+        // Pre-load HMS Push stubs so NAPI modules "core.push.pushService"
+        // and "core.push.pushCommon" are registered before any HAP
+        // tries to import them.
+        try {
+            System.loadLibrary("hms_push")
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_push\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_push\") — FAILED", e)
+        }
+
         try {
             super.onCreate()
             initSuccess = true
