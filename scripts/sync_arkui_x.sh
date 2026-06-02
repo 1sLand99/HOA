@@ -244,13 +244,10 @@ if ! $SO_ONLY && ! $ABC_ONLY; then
 
     # C1b. Plugin JARs — copy all .jar from plugins/ except .interface.jar
     log "--- C1b: Plugin JARs ---"
-    for plugin_dir in "$ARKUI_BUILD"/plugins/*/; do
-        for jar in "$plugin_dir"*.jar; do
-            [ -f "$jar" ] || continue
-            case "$jar" in *.interface.jar) continue ;; esac
-            copy_file "$jar" "$JAR_DIR/$(basename "$jar")"
-        done
-    done
+    while IFS= read -r -d '' jar; do
+        case "$jar" in *.interface.jar) continue ;; esac
+        copy_file "$jar" "$JAR_DIR/$(basename "$jar")"
+    done < <(find "$ARKUI_BUILD"/plugins/ -name "*.jar" -print0)
 
     # C2. resources.index — 系统资源索引
     log "--- C2: resources.index ---"
