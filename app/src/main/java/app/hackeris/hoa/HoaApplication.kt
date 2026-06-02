@@ -93,6 +93,25 @@ class HoaApplication : StageApplication() {
             LogWriter.e(TAG, "System.loadLibrary(\"hms_push\") — FAILED", e)
         }
 
+        // Pre-load HMS Account stub so NAPI module "core.account.extendservice"
+        // is registered before any HAP tries to import it.
+        try {
+            System.loadLibrary("hms_account")
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_account\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_account\") — FAILED", e)
+        }
+
+        // Pre-load HMS IAP + Payment stubs so NAPI modules "core.iap"
+        // and "core.payment.paymentService" are registered before any HAP
+        // tries to import them.
+        try {
+            System.loadLibrary("hms_iap")
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_iap\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_iap\") — FAILED", e)
+        }
+
         try {
             super.onCreate()
             initSuccess = true
