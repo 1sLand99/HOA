@@ -73,6 +73,16 @@ class HoaApplication : StageApplication() {
             LogWriter.e(TAG, "System.loadLibrary(\"hms_hds\") — FAILED", e)
         }
 
+        // Pre-load HMS Security stubs so NAPI modules "security.deviceCertificate",
+        // "core.AAID", and "security.safetyDetect" are registered before any HAP
+        // tries to import them.
+        try {
+            System.loadLibrary("hms_security")
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_security\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            LogWriter.e(TAG, "System.loadLibrary(\"hms_security\") — FAILED", e)
+        }
+
         try {
             super.onCreate()
             initSuccess = true
