@@ -110,4 +110,5 @@
     <string name="toast_logs_exported">Logs Exported</string>
     <string name="dialog_share">Share</string>
     <string name="toast_logs_export_failed">Log export failed: %1$s</string>
+    <string name="err_not_hap_file">Please select a .hap or .app file</string>
 </resources>

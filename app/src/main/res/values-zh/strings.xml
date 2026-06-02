@@ -111,4 +111,5 @@
     <string name="dialog_hdc_port_title">HDC 端口</string>
     <string name="dialog_hdc_port_msg">输入 HDC 守护进程的 TCP 端口 (1024–65535)</string>
     <string name="toast_hdc_invalid_port">无效的端口号 (1024–65535)</string>
+    <string name="err_not_hap_file">请选择 .hap 或 .app 文件</string>
 </resources>

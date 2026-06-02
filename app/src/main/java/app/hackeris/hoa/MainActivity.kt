@@ -246,7 +246,6 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/octet-stream", "application/zip"))
         }
         startActivityForResult(intent, REQUEST_PICK_HAP)
     }
@@ -255,7 +254,26 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQUEST_PICK_HAP && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
+            val name = queryFileName(uri)
+            if (name != null && !name.endsWith(".hap", ignoreCase = true) && !name.endsWith(".app", ignoreCase = true)) {
+                com.google.android.material.snackbar.Snackbar.make(
+                    findViewById(android.R.id.content),
+                    R.string.err_not_hap_file,
+                    com.google.android.material.snackbar.Snackbar.LENGTH_SHORT
+                ).show()
+                return
+            }
             previewAndInstallHap(uri)
+        }
+    }
+
+    private fun queryFileName(uri: Uri): String? {
+        val cursor = contentResolver.query(uri, null, null, null, null)
+        return cursor?.use {
+            if (it.moveToFirst()) {
+                val idx = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0) it.getString(idx) else null
+            } else null
         }
     }
 
