@@ -1,6 +1,6 @@
 # OHOS HAP on Android — 技术调研文件索引
 
-> **当前状态** (2026-05-25): ArkUI-X weekly_20260518 移植完成，5 个仓库定向适配，5 个已安装 HAP 中 4 个正常渲染 + 1 个部分渲染（HDS mock）。详见 [PROGRESS.md](PROGRESS.md)。
+> **当前状态** (2026-06-03): ArkUI-X weekly_20260518 移植完成，7 个仓库定向适配，HDS mock、FilePicker JAR 补齐、musl bridge 完成、HDC daemon 可用、pure-ABC 模块集成方案落地、ohbili 白屏问题定位并解决。详见 [PROGRESS.md](PROGRESS.md)。
 
 ## 项目目标
 
