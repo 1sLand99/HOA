@@ -72,19 +72,19 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
         paramGet.find(command)?.let { match ->
             val key = match.groupValues[1]
             return when (key) {
-                "const.ohos.apiversion" -> "23"
+                "const.ohos.apiversion" -> "26"
                 "const.ohos.apiminorversion" -> "0"
                 "const.ohos.apipatchversion" -> "0"
-                "const.ohos.fullname" -> "OpenHarmony-6.1.0.100"
+                "const.ohos.fullname" -> "OpenHarmony-7.0.0"
                 "const.ohos.releasetype" -> "Release"
-                "const.ohos.sdkapiversion" -> "23"
-                "const.ohos.majorversion" -> "6"
+                "const.ohos.sdkapiversion" -> "26"
+                "const.ohos.majorversion" -> "7"
                 "const.product.model" -> "HOA-01"
                 "const.product.name" -> "HOA"
                 "const.product.brand" -> "HOA"
                 "const.product.manufacturer" -> "HOA"
                 "const.product.devicetype" -> "phone"
-                "const.product.software.version" -> "6.1.0.100"
+                "const.product.software.version" -> "7.0.0"
                 "const.product.hardware.version" -> "1.0.0"
                 "const.build.product" -> "HOA"
                 "const.os.distributedsupport" -> "false"
@@ -107,10 +107,10 @@ class HdcShellHandler(private val daemon: HdcDaemon) {
                 "persist.hdc.daemon.auth_result" -> "SUCCESS"
                 "persist.hdc.jdwp" -> ""
                 "ohos.qemu.hvd.name" -> ""
-                "persist.sys.hilog.fullname" -> "HarmonyOS-6.1.0.100"
-                "persist.sys.hilog.version" -> "6.1.0.100"
+                "persist.sys.hilog.fullname" -> "HarmonyOS-7.0.0"
+                "persist.sys.hilog.version" -> "7.0.0"
                 "persist.sys.hilog.debug.on" -> "true"
-                "ro.build.version.sdk" -> "23"
+                "ro.build.version.sdk" -> "26"
                 else -> {
                     daemon.log("Unmocked param get: $key, returning empty")
                     ""  // unknown param keys: return empty, don't let shell fail
