@@ -54,6 +54,7 @@
 - [abc-bytecode-format.md](abc-bytecode-format.md) — PANDA ABC 二进制格式、VM 加载执行流水线、es2panda 编译管线、NAPI 桥接原理、跨平台执行条件
 - [arkui-x-build-system.md](arkui-x-build-system.md) — ArkUI-X GN 构建架构、仓库组织（直接复用 OHOS 核心代码）、平台动态发现机制、分层设计原则
 - [hms-hds-stub.md](hms-hds-stub.md) — **HDS Stub 解决方案（已实施）**：嵌入式 ABC mock（ViewPU 组合 HdsActionBar）+ ReplaceModuleThroughFeature 重定向，覆盖 ES import 和 HSP record 双路径；ABC-only 模式、export default 关键发现、SDK 声明 vs 编译器白名单双来源分析
+- [pure-abc-module-integration.md](pure-abc-module-integration.md) — **Pure-ABC 模块集成经验（以 @ohos.fileio 为例）**：无 .so 纯 ABC stub 的完整集成流程、三种 stub 模式对比、扁平化 default export 规则、模块加载回退链、BUILD.gn 模板、常见问题排查
 - [test-hap-analysis.md](test-hap-analysis.md) — 测试 HAP 样本完整分析: 内部结构、3 个模块记录、10 个外部依赖分类（@ohos: / @native: / L-class）、复杂度评估
 
 ### 渲染
