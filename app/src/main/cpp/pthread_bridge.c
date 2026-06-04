@@ -208,10 +208,20 @@ struct pthread *__musl_bridge_self(void)
 
 static int *(*bionic_errno_loc)(void);
 
+// Recursion guard: dlsym() on some custom ROMs may internally call
+// __errno_location, which would re-enter this function before the
+// function pointer is stored → infinite recursion → stack overflow.
+static volatile int errno_loc_resolving = 0;
+
 int *__errno_location(void)
 {
     if (!bionic_errno_loc) {
+        if (__atomic_load_n(&errno_loc_resolving, __ATOMIC_ACQUIRE)) {
+            return &__musl_bridge_self()->errno_val;
+        }
+        __atomic_store_n(&errno_loc_resolving, 1, __ATOMIC_RELEASE);
         bionic_errno_loc = (int *(*)(void))dlsym(RTLD_NEXT, "__errno_location");
+        __atomic_store_n(&errno_loc_resolving, 0, __ATOMIC_RELEASE);
         if (!bionic_errno_loc) {
             return &__musl_bridge_self()->errno_val;
         }
@@ -231,7 +241,7 @@ static int find_libb_tls(struct dl_phdr_info *info, size_t size, void *data)
 {
     (void)size;
     (void)data;
-    if (!strstr(info->dlpi_name, "libb.so")) return 0;
+    if (!info->dlpi_name || !strstr(info->dlpi_name, "libb.so")) return 0;
 
     for (int i = 0; i < info->dlpi_phnum; i++) {
         if (info->dlpi_phdr[i].p_type != PT_TLS) continue;
