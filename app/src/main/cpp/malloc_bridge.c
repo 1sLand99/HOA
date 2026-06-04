@@ -4,6 +4,10 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <linux/futex.h>
+#include <android/log.h>
+
+#define BRIDGE_LOG(fmt, ...) \
+    __android_log_print(ANDROID_LOG_ERROR, "malloc_bridge", fmt, ##__VA_ARGS__)
 
 // Bridge musl's internal allocator entry points to bionic jemalloc/scudo.
 //
@@ -45,7 +49,16 @@ __attribute__((constructor))
 static void __malloc_bridge_init(void)
 {
     __asm__ ("mrs %0, tpidr_el0" : "=r"(main_bionic_tp));
+    __android_log_print(ANDROID_LOG_ERROR, "malloc_bridge", "INIT: main_bionic_tp=0x%lx", (unsigned long)main_bionic_tp);
 }
+
+// Tracks per-tid malloc call count for logging (first N calls only).
+// Written under bionic TP; read under lock_file_key.
+static struct {
+    pid_t tid;
+    int call_count;
+} tid_call_log[32];
+static volatile int tid_call_log_count = 0;
 
 // Look up or allocate the per-thread bionic TLS block for the calling thread.
 static uintptr_t get_bionic_tp(void)
@@ -67,6 +80,7 @@ static uintptr_t get_bionic_tp(void)
     for (int i = n - 1; i >= 0; i--) {
         if (tls_table[i].tid == tid) {
             uintptr_t tp = tls_table[i].tp;
+            BRIDGE_LOG("SLOW-HIT: tid=%d reusing TLS[%d] (other thread registered it)", tid, i);
             tls_unlock_table();
             return tp;
         }
@@ -77,6 +91,11 @@ static uintptr_t get_bionic_tp(void)
     uintptr_t saved, block;
     __asm__ volatile ("mrs %0, tpidr_el0" : "=r"(saved));
     __asm__ volatile ("msr tpidr_el0, %0" :: "r"(main_bionic_tp));
+
+    int total = tls_count;
+    BRIDGE_LOG("NEW-TLS: tid=%d allocating TLS block (total=%d -> %d, saved_tp=0x%lx main_tp=0x%lx)",
+               tid, total, total + 1, (unsigned long)saved, (unsigned long)main_bionic_tp);
+
     block = (uintptr_t)calloc(1, BIONIC_TLS_SIZE);
     __asm__ volatile ("msr tpidr_el0, %0" :: "r"(saved));
 
@@ -99,7 +118,35 @@ static inline void enter_bionic_alloc(uintptr_t *saved)
         return;
     }
     *saved = tp;
-    __asm__ volatile ("msr tpidr_el0, %0" :: "r"(get_bionic_tp()));
+    uintptr_t bionic_tp = get_bionic_tp();
+    __asm__ volatile ("msr tpidr_el0, %0" :: "r"(bionic_tp));
+
+    // Log first few malloc calls from each musl tid (safe: on bionic TP)
+    pid_t tid = (pid_t)syscall(SYS_gettid);
+    int cnt = __atomic_load_n(&tid_call_log_count, __ATOMIC_ACQUIRE);
+    int found = 0;
+    for (int i = 0; i < cnt && i < 32; i++) {
+        if (tid_call_log[i].tid == tid) {
+            found = 1;
+            if (tid_call_log[i].call_count < 5) {
+                tid_call_log[i].call_count++;
+                BRIDGE_LOG("MALLOC: tid=%d call#%d (musl thread, tp=0x%lx bionic_tp=0x%lx)",
+                           tid, tid_call_log[i].call_count, (unsigned long)tp, (unsigned long)bionic_tp);
+            }
+            return;
+        }
+    }
+    if (!found && cnt < 32) {
+        // New musl tid — register under a simple ad-hoc lock
+        // Re-use tls_lock for simplicity (we're already past the table lookup)
+        int slot = __atomic_fetch_add(&tid_call_log_count, 1, __ATOMIC_RELAXED);
+        if (slot < 32) {
+            tid_call_log[slot].tid = tid;
+            tid_call_log[slot].call_count = 1;
+            BRIDGE_LOG("MALLOC: tid=%d FIRST-CALL (musl thread, tp=0x%lx bionic_tp=0x%lx)",
+                       tid, (unsigned long)tp, (unsigned long)bionic_tp);
+        }
+    }
 }
 
 static inline void leave_bionic_alloc(uintptr_t saved)

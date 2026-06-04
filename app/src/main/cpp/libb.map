@@ -35,7 +35,9 @@
         fputc; fputs; putc; putchar; puts;
         getw; putw;
         getdelim; getline;
-        fseek; ftell; fgetpos; fsetpos; rewind;
+        fseek; fseeko; fseeko64;
+        ftell; ftello; ftello64;
+        fgetpos; fsetpos; rewind;
         fflush;
         clearerr; feof; ferror; fileno;
         setbuf; setbuffer; setlinebuf; setvbuf;

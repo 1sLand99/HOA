@@ -27,3 +27,15 @@ set_target_properties(hilog_ndk_z PROPERTIES
 )
 
 target_link_libraries(hilog_ndk_z PRIVATE log)
+
+# libohaudio.so — OHOS OHAudio stub
+# Provides dummy OH_AudioStreamBuilder_* / OH_AudioRenderer_* symbols.
+# GenerateRenderer returns AUDIOSTREAM_ERROR_SYSTEM so callers can
+# fall back to silent / no-audio mode.
+# SONAME must be "libohaudio.so" to match OHOS HAP DT_NEEDED.
+add_library(ohaudio SHARED src/main/cpp/ohaudio_stub.c)
+
+set_target_properties(ohaudio PROPERTIES
+    OUTPUT_NAME "ohaudio"
+    LINK_FLAGS "-Wl,-soname,libohaudio.so -nostartfiles -nostdlib"
+)
