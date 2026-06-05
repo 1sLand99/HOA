@@ -88,7 +88,7 @@ repo init (HOA manifest) → prebuilts_download.sh → build.sh → build_musl_b
 - **生产模式**：MainActivity → Install HAP（选择文件）→ 点击启动
 - **开发测试**：`adb shell am start -n app.hackeris.hoa/.DevTestActivity --ez autoLaunch true`
 
-要求：Android 8.0+，arm64-v8a 设备。
+要求：Android 11+，arm64-v8a 设备。
 
 ## 社区
 

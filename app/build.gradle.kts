@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "app.hackeris.hoa"
-        minSdk = 26
+        minSdk = 30
         targetSdk = 33
         // 版本号编制规则:
         //   versionName = YY.M.D.B  (年.月.日.当日构建次数)
