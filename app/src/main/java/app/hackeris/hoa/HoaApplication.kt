@@ -1,5 +1,6 @@
 package app.hackeris.hoa
 
+import android.webkit.WebView
 import app.hackeris.hoa.logging.LogWriter
 import ohos.stage.ability.adapter.StageApplication
 
@@ -41,6 +42,19 @@ class HoaApplication : StageApplication() {
     }
 
     private fun initArkUIX() {
+        // Android 10+ requires setDataDirectorySuffix for WebView multi-process.
+        // Without this, the second HAP process that creates a WebView gets a
+        // white screen because the WebView rendering engine data directory is
+        // locked by the first process.  Each process gets its own suffix so
+        // they can coexist.  Colon (:) in process names is replaced with '_'.
+        val suffix = currentProcessName().replace(':', '_')
+        try {
+            WebView.setDataDirectorySuffix(suffix)
+            LogWriter.i(TAG, "WebView.setDataDirectorySuffix(\"$suffix\") — OK")
+        } catch (e: Exception) {
+            LogWriter.e(TAG, "WebView.setDataDirectorySuffix(\"$suffix\") — FAILED", e)
+        }
+
         // Load musl ABI bridge (libb.so) FIRST — it must be in the linker
         // namespace before any HAP .so files load, so musl symbols resolve
         // through libb.so instead of bionic libc.so.
