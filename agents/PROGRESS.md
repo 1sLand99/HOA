@@ -534,9 +534,11 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 
 - HdsActionBar mock 视觉完善（innerSpace 按钮间距、isHorizontal 垂直布局、shadowStyle/backgroundBlurStyle）—— 结构已就绪（ViewV2），需补充视觉属性
 - Vulkan RenderContext 创建失败时明确回退到 OpenGL ES
-- `@ohos.pulltorefresh` 第三方 ohpm 包支持（wan-harmony 多个页面依赖）
-- `@ohos.promptAction` 插件补齐
 - HDC 端口持久化：app 重启后自动恢复上次端口，无需手动重新配置
+
+> **已从短期列表移除（无需处理）**：
+> - `@ohos.promptAction` — `libpromptaction.so` 已随 ArkUI-X 构建打包，存在于 `jniLibs/`
+> - `@ohos.pulltorefresh` — 属于第三方 ohpm 包，HAP 构建时已打包在包内，运行时无需 stub
 
 ### 中期
 
