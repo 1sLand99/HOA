@@ -233,7 +233,7 @@ HDS（Huawei Design System）是 HMS SDK 的 UI 组件库（`@kit.UIDesignKit`, 
 **策略**: 嵌入式 ABC mock（ABC-only 模式，参考 popup 插件）+ module_resolver 重定向，覆盖 ES import 和 HSP record 双路径。
 
 **实现方式**:
-- JS mock 源码 (`src/hds_component_mock.js`) 提供 ViewPU 组合实现的 HdsActionBar（Row + Button + Image）、ActionBarButton/ActionBarStyle 数据类、组件委托（Navigation/NavDestination/Tabs/ListItem）、枚举、stub 函数
+- JS mock 源码 (`src/hds_component_mock.js`) 提供 ViewV2 组合实现的 HdsActionBar（Row + Button + Image）、ActionBarButton/ActionBarStyle 数据类、组件委托（Navigation/NavDestination/Tabs/ListItem）、枚举、stub 函数
 - 三步 ABC 构建流水线：`es2abc --module` → `llvm-objcopy` 嵌入 → `ohos_source_set` 链接进 `libhms_hds.so`
 - C++ stub 简化为 ABC-only 模式（`nm_register_func = nullptr`），通过 `napi_module_with_js_register` 同时注册 `hds.hdsBaseComponent` 和 `UIDesignKit` 两个模块名
 - 配合 `arkcompiler/ets_runtime` 中 `ReplaceModuleThroughFeature` 的 HDS HSP record 重定向（commit `16a93345c`）

@@ -17,7 +17,7 @@
 | 权限映射 | 部分 | 普通权限自动映射（INTERNET 等），危险权限需手动处理 |
 | 生命周期 | 部分 | onCreate/onResume/onPause/onDestroy 已对接，部分中间状态未实现 |
 | HDS 组件 | 部分 | 70+ 导出 mock，功能正确但视觉与原版差异较大 |
-| 第三方 ohpm 包 | 不支持 | 如 @ohos.pulltorefresh、@ohos.promptAction 等尚未补齐 |
+
 | 完整 Bundle Manager | 不支持 | 未实现，`bundleInfo_ is nullptr` 日志警告 |
 | 后台能力 / Service | 不支持 | 未实现 |
 | 分布式 / 多设备 | 不支持 | 未实现 |

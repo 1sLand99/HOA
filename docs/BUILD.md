@@ -1,6 +1,6 @@
 # Building HOA
 
-HOA 基于 ArkUI-X 构建体系，通过 repo + manifest 管理 6 个定制仓库。
+HOA 基于 ArkUI-X 构建体系，通过 repo + manifest 管理 8 个定制仓库。
 
 构建流程：
 
@@ -43,7 +43,7 @@ export PATH=${JAVA_HOME}/bin:${PATH}
 
 ### Android SDK
 
-需要 NDK 21.3.6528147、SDK Platform 26+（HOA APK 需 34+）、Build Tools 28.0.3+。
+需要 NDK 21.3.6528147、SDK Platform 34、Build Tools 28.0.3+。
 
 ```bash
 ./sdkmanager --install "ndk;21.3.6528147" --sdk_root=/path/to/Android/Sdk
@@ -104,7 +104,7 @@ cd /path/to/HOA
 
 ## Step 1: 下载源码
 
-拉取 ArkUI-X 源码树，6 个定制仓库 override 到 `harmony-on-android` 组织的 fork。
+拉取 ArkUI-X 源码树，8 个定制仓库 override 到 `harmony-on-android` 组织的 fork。
 
 ```bash
 mkdir -p ~/arkui-x-hoa

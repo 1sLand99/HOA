@@ -1,5 +1,8 @@
 # Native .so 兼容方案 — musl/bionic 源码交叉验证
 
+> **设计文档**: `agents/native-so-compat.md`（方案概述、架构图、构建说明）
+> **当前实现**: `CLAUDE.md` libb.so 章节 + `app/src/main/cpp/` 源码
+
 对照 bionic 和 OHOS musl 源码，验证方案关键假设。bionic 源码位于本机 `bionic/` 目录，musl 源码位于 `third_party/musl/`。
 
 ---
@@ -246,7 +249,7 @@ musl 的 `pthread_rwlock_rdlock.c`、`pthread_rwlock_wrlock.c` 等使用纯 atom
 
 不过需注意：rwlock 的慢速路径调用 `__timedwait()` → `__pthread_setcancelstate()` → `__pthread_self()`，但此时线程必须已经注册（或首次调用 auto-register），不是问题。
 
-### 3.4 bionic scudo 分配器的 TLS slot 冲突
+### 3.4 bionic scudo 分配器的 TLS slot 冲突（已解决：TLS-swap）
 
 bionic 的 scudo 分配器（`malloc` 的底层实现）使用 `TLS_SLOT_SANITIZER`（aarch64 上 `__get_tls()[6]`）存储每线程分配器状态：
 
@@ -257,20 +260,26 @@ inline uintptr_t* getPlatformAllocatorTlsSlot() {
 }
 ```
 
-在 musl 创建的线程上，`__get_tls()` 返回 musl 的 TP（指向 musl TLS block），`[6]` 访问的是 musl TLS 区域内的内存——可能是 `struct pthread` 的 `tls_slots` 数组区域。如果 scudo 向此地址写入每线程状态指针，会**损坏 musl 内部数据**。
+在 musl 创建的线程上，`__get_tls()` 返回 musl 的 TP（指向 musl TLS block），`[6]` 访问的是 musl TLS 区域内的内存。如果 scudo 向此地址写入每线程状态指针，会**损坏 musl 内部数据**。
 
-反之，如果 musl 的 TLS 在该偏移处恰好有非零值，scudo 可能将其误读为已初始化的分配器状态 → 内存分配器错误。
+**实际解决方案（malloc_bridge.c）**：不再规避此问题，而是在每次进入 bionic 分配器前切换到 per-thread bionic TLS block：
 
-**影响范围**：musl 线程上任何触发 bionic `malloc`/`free` 的操作（通过 `malloc_bridge.c`）。包括：
-- `__musl_bridge_register()` 不会触发（只做表插入，不分配）
-- `__musl_bridge_self()` 的热路径不会触发（查表命中，不分配）
-- 但如果 musl 线程内部调用 `malloc`/`free`（musl 的 mallocng 已被桥接到 bionic malloc），就会触发
+```
+malloc/free 入口
+  → enter_bionic_alloc(&saved)
+    → 检查 tpidr_el0: 如果是 main bionic thread → 跳过（fast path）
+    → 保存当前 musl TP → get_bionic_tp() → msr tpidr_el0, bionic_tp
+  → real_malloc/real_free (bionic scudo)
+  → leave_bionic_alloc(saved)
+    → msr tpidr_el0, saved (恢复 musl TP)
+```
 
-**缓解措施**：
-- 初期：musl 线程的 `malloc`/`free` 仍走 musl 自己的 mallocng（不桥接）。只有 bionic 线程的 `malloc` 调用才走 bionic jemalloc。这避免了两类线程上的 scudo TLS 冲突
-- 长期：在 musl 的 TLS 布局中预留 scudo slot 位置，或在 bridge 中拦截 scudo 的 `getPlatformAllocatorTlsSlot()` 调用
+- Per-thread bionic TLS block 用 `real_calloc(1, 64)` 分配，零初始化，scudo 可以安全读写 TLS_SLOT_SANITIZER
+- TLS table 用 futex-based spinlock 保护
+- 主线程的 bionic_tp 在 constructor 中捕获（`mrs tpidr_el0`），用于 bootstrap 新 TLS block 分配
+- `real_malloc`/`real_free` 通过 `dlsym(RTLD_NEXT, ...)` 解析，避免 PLT 递归
 
-由于 musl 线程（HAP 自建线程）初期被禁止（见风险表），此问题短期不触发。但 `malloc_bridge.c` 的设计应在注释中标注此限制。
+> **原始分析（已修正）**：早期方案计划"musl 线程的 malloc/free 走 musl 自己的 mallocng，禁止 musl 自建线程"。实际实现完全解决了此问题，musl 线程的 malloc/new/delete 均通过 TLS-swap 正常工作。详见 `CLAUDE.md` 的 malloc_bridge.c 章节。
 
 ### 3.5 musl `__thread` / `_Thread_local` 变量
 
@@ -324,7 +333,9 @@ inline uintptr_t* getPlatformAllocatorTlsSlot() {
 
 `tsd` 数组需要额外 1024 字节（`PTHREAD_KEYS_MAX=128 × sizeof(void*)=8`）。应在 `MUSL_PTHREAD_MAX_SIZE` 中留出空间，或单独分配。
 
-### 3.7 musl SIGCANCEL 与 bionic 信号体系
+### 3.7 信号 ABI 桥接（已实现：signal_bridge.c）
+
+> **当前实现**: `signal_bridge.c` 完整解决了 musl/bionic sigaction ABI 不兼容问题，见 `CLAUDE.md`。
 
 musl 使用信号 33（`SIGCANCEL = SIGRTMIN+1`，内核编号）做线程取消。bionic 的内核信号布局：
 
@@ -334,13 +345,13 @@ musl 使用信号 33（`SIGCANCEL = SIGRTMIN+1`，内核编号）做线程取消
 | 33 | libbacktrace (`BIONIC_SIGNAL_BACKTRACE`) | 保持不阻塞，无默认 handler |
 | 34 | debuggerd (`BIONIC_SIGNAL_DEBUGGER`) | 保持不阻塞 |
 
-musl 的 SIGCANCEL = 33（内核信号 33 = `__SIGRTMIN + 1`）。bionic 对信号 33 **保持不阻塞且无默认 handler**，因此 musl 可以为它安装 handler。
+musl 的 SIGCANCEL = 33。bionic 对信号 33 **保持不阻塞且无默认 handler**，因此 musl 可以为它安装 handler。信号 33 可用，bionic 不做拦截。如果 HAP 代码从不调 `pthread_cancel()`（常见情况），则 SIGCANCEL handler 不会被安装，完全无冲突。
 
-但 bionic 将内核信号 32-41 标记为 "reserved"（`__SIGRT_RESERVED = 10`），用户可见的 `SIGRTMIN` 被偏移到 42。这意味着：
-- 如果 HAP .so 内部使用 `SIGRTMIN` 宏（musl 编译的值 = `__SIGRTMIN` = 32），它会指向已被 bionic 保留的范围
-- musl 的 `cancel_handler` 安装不经过 bionic 的 `sigaction` 包装（musl 直接 `__libc_sigaction` → syscall），可以绕过 bionic 的 `filter_reserved_signals`
-
-**结论**：信号 33 可用，bionic 不做拦截。但如果 HAP 代码从不调 `pthread_cancel()`（常见情况），则 SIGCANCEL handler 不会被安装，完全无冲突。
+实际 signal_bridge.c 实现：
+- musl `struct sigaction`（40 字节，sa_handler@0）→ kernel 布局（32 字节）转换
+- 直接通过 `SYS_rt_sigaction` syscall 注册，绕过 bionic 的 sigaction 包装
+- 拒绝 musl 保留信号 32-34（SIGCANCEL/SIGSYNCCALL/SIGTIMER）
+- 配合 `-Wl,-Bsymbolic` 防止被 `libsigchain.so` 抢占
 
 ### 3.8 线程退出与 tid 回收
 
@@ -364,16 +375,16 @@ musl 的 `__pthread_exit()` 在退出前执行 `self->tid = 0`（注释："After
 
 | # | 问题 | 修改位置 | 修改内容 |
 |---|------|---------|---------|
-| 1 | bionic rwlock 在 musl 线程上 crash | `pthread_bridge.c` | 用 `futex + atomic` 替代 `dlsym(RTLD_NEXT)` 获取的 bionic rwlock |
+| 1 | bionic rwlock 在 musl 线程上 crash | `pthread_bridge.c` | 用 `futex + atomic` 替代 bionic rwlock |
 | 2 | 前向声明 sizeof 不足以覆盖 musl 真实 struct | `pthread_bridge.c` | 用固定大缓冲区（8192B）替代 `sizeof(struct pthread)`；同时补 `proc_tid` 字段 |
-| 3 | NDK headers 编译冲突 | `Makefile` | musl 源文件的 include path 中将 musl headers 放在 NDK sysroot 之前 |
+| 3 | NDK headers 编译冲突 | `Makefile.musl_bridge` | musl 源文件的 include path 中将 musl headers 放在 NDK sysroot 之前 |
 | 4 | `self->tsd` = NULL 导致 crash | `pthread_bridge.c` | 分配 128×void* TSD 数组，写入偏移 120 |
 | 5 | `self->locale` = NULL 导致 crash | `pthread_bridge.c` | 设置偏移 160 为 musl `&libc.global_locale`（extern 声明） |
 | 6 | `self->prev`/`next` = NULL 导致 `__pthread_exit` unlink 时 crash | `pthread_bridge.c` | 初始化为自环 |
 | 7 | `robust_list.head` 未初始化 | `pthread_bridge.c` | 指向自身 |
 | 8 | `detach_state` = 0 导致 `pthread_exit` 不清理 | `pthread_bridge.c` | 设为 DT_JOINABLE (2) |
 | 9 | `canceldisable` = 0（允许取消）在 bionic 线程上不安全 | `pthread_bridge.c` | 设为 1（PTHREAD_CANCEL_DISABLE） |
-| 10 | scudo TLS slot 冲突（musl 线程上 bionic malloc） | 文档/风险表 | 初期禁止 musl 自建线程；`malloc_bridge.c` 注释标注限制 |
+| 10 | scudo TLS slot 冲突（musl 线程上 bionic malloc） | `malloc_bridge.c` | **已解决**：TLS-swap（enter_bionic_alloc/leave_bionic_alloc），每次分配前切换到 per-thread bionic TLS block |
 
 ## 参考
 
