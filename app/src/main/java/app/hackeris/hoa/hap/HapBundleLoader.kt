@@ -576,32 +576,36 @@ class HapBundleLoader {
          *    compositing foreground + background into a single PNG.
          */
         fun loadHapIcon(moduleDir: java.io.File, config: ModuleConfig): android.graphics.Bitmap? {
-            // Step 1-2: determine iconId
-            var iconId = 0
+            // Step 1-2: determine iconId — prefer ability icon, fall back to app icon
+            val iconIds = mutableListOf<Int>()
             val mainAbility = config.abilities.find { it.name == config.mainElement }
             if (mainAbility != null && mainAbility.iconId != 0) {
-                iconId = mainAbility.iconId
+                iconIds.add(mainAbility.iconId)
             }
-            if (iconId == 0) {
-                iconId = config.iconId
+            if (config.iconId != 0) {
+                iconIds.add(config.iconId)
             }
-            if (iconId == 0) return null
+            if (iconIds.isEmpty()) return null
 
-            // Step 3: resolve iconId → file path via resources.index
-            val iconPath = resolveMediaPathById(moduleDir, iconId) ?: return null
+            // Try each iconId in order until one loads successfully.
+            // This handles the case where the ability icon is an unsupported
+            // format (e.g. SVG) but the app-level icon (layered PNG) works.
+            for (iconId in iconIds) {
+                val iconPath = resolveMediaPathById(moduleDir, iconId) ?: continue
+                val iconFile = java.io.File(moduleDir, stripModulePrefix(iconPath))
+                if (!iconFile.exists()) continue
 
-            val iconFile = java.io.File(moduleDir, stripModulePrefix(iconPath))
-            if (!iconFile.exists()) return null
-
-            // Step 4: read the file
-            return when {
-                iconFile.extension.equals("json", ignoreCase = true) ->
-                    loadLayeredIcon(moduleDir, iconFile)
-                iconFile.extension.equals("svg", ignoreCase = true) ->
-                    loadSvgAsPng(iconFile)
-                else ->
-                    android.graphics.BitmapFactory.decodeFile(iconFile.absolutePath)
+                val bitmap = when {
+                    iconFile.extension.equals("json", ignoreCase = true) ->
+                        loadLayeredIcon(moduleDir, iconFile)
+                    iconFile.extension.equals("svg", ignoreCase = true) ->
+                        loadSvgAsPng(iconFile)
+                    else ->
+                        android.graphics.BitmapFactory.decodeFile(iconFile.absolutePath)
+                }
+                if (bitmap != null) return bitmap
             }
+            return null
         }
 
         private fun loadLayeredIcon(moduleDir: java.io.File, jsonFile: java.io.File): android.graphics.Bitmap? {
