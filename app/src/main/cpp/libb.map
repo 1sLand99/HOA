@@ -80,6 +80,15 @@
         __libc_realloc;
         __libc_calloc;
 
+        /* malloc / free / realloc / calloc — exported so musl-compiled
+         * .so files resolve these against libb.so instead of falling
+         * through to bionic's scudo directly.  Each wrapper swaps to
+         * bionic TLS, calls the real bionic allocator, then restores. */
+        malloc;
+        free;
+        realloc;
+        calloc;
+
         /* bridge API */
         __musl_bridge_self;
         __musl_bridge_register;

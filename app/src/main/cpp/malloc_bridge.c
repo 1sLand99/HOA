@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <dlfcn.h>
 #include <sys/syscall.h>
 #include <linux/futex.h>
 #include <android/log.h>
@@ -18,11 +19,25 @@
 //
 // The main thread's bionic_tp is captured at init and used only as a one-shot
 // bootstrap when allocating a new TLS block for a musl thread.
+//
+// malloc / free / realloc / calloc are also exported so that musl-compiled
+// .so files (e.g. libentry.so inside a HAP) resolve those symbols to libb.so
+// instead of falling through to bionic's libc.so.  Without this, worker
+// threads would call bionic's scudo directly without the TLS swap and crash
+// on tagged-pointer mismatches.
 
 #define BIONIC_TLS_SIZE 64
 #define MAX_TLS_ENTRIES 128
 
 static uintptr_t main_bionic_tp;
+
+// Pointers to bionic's real allocator functions, resolved via dlsym(RTLD_NEXT)
+// at init to avoid PLT recursion (our own malloc/free wrappers are exported
+// from this library, so a plain PLT call would bind to ourselves).
+static void *(*real_malloc)(size_t) = NULL;
+static void (*real_free)(void *) = NULL;
+static void *(*real_realloc)(void *, size_t) = NULL;
+static void *(*real_calloc)(size_t, size_t) = NULL;
 
 static struct {
     pid_t tid;
@@ -50,6 +65,13 @@ static void __malloc_bridge_init(void)
 {
     __asm__ ("mrs %0, tpidr_el0" : "=r"(main_bionic_tp));
     __android_log_print(ANDROID_LOG_ERROR, "malloc_bridge", "INIT: main_bionic_tp=0x%lx", (unsigned long)main_bionic_tp);
+
+    // Resolve bionic's real allocator functions once.
+    // RTLD_NEXT skips libb.so itself, so these always go to bionic.
+    real_malloc  = (void *(*)(size_t))dlsym(RTLD_NEXT, "malloc");
+    real_free    = (void (*)(void *))dlsym(RTLD_NEXT, "free");
+    real_realloc = (void *(*)(void *, size_t))dlsym(RTLD_NEXT, "realloc");
+    real_calloc  = (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "calloc");
 }
 
 // Tracks per-tid malloc call count for logging (first N calls only).
@@ -96,7 +118,7 @@ static uintptr_t get_bionic_tp(void)
     BRIDGE_LOG("NEW-TLS: tid=%d allocating TLS block (total=%d -> %d, saved_tp=0x%lx main_tp=0x%lx)",
                tid, total, total + 1, (unsigned long)saved, (unsigned long)main_bionic_tp);
 
-    block = (uintptr_t)calloc(1, BIONIC_TLS_SIZE);
+    block = (uintptr_t)real_calloc(1, BIONIC_TLS_SIZE);
     __asm__ volatile ("msr tpidr_el0, %0" :: "r"(saved));
 
     if (block && tls_count < MAX_TLS_ENTRIES) {
@@ -137,8 +159,6 @@ static inline void enter_bionic_alloc(uintptr_t *saved)
         }
     }
     if (!found && cnt < 32) {
-        // New musl tid — register under a simple ad-hoc lock
-        // Re-use tls_lock for simplicity (we're already past the table lookup)
         int slot = __atomic_fetch_add(&tid_call_log_count, 1, __ATOMIC_RELAXED);
         if (slot < 32) {
             tid_call_log[slot].tid = tid;
@@ -155,11 +175,16 @@ static inline void leave_bionic_alloc(uintptr_t saved)
         __asm__ volatile ("msr tpidr_el0, %0" :: "r"(saved));
 }
 
+// ── Bridge entry points called by musl's internal allocator ──────────────
+// musl's lite_malloc.c / free.c call these for the actual allocation.
+// They swap to bionic TLS, call bionic's allocator (via real_* pointers
+// resolved at init), then restore musl TLS.
+
 void *__libc_malloc_impl(size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
-    void *p = malloc(n);
+    void *p = real_malloc(n);
     leave_bionic_alloc(s);
     return p;
 }
@@ -168,7 +193,7 @@ void __libc_free(void *p)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
-    free(p);
+    real_free(p);
     leave_bionic_alloc(s);
 }
 
@@ -176,7 +201,7 @@ void *__libc_realloc(void *p, size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
-    void *r = realloc(p, n);
+    void *r = real_realloc(p, n);
     leave_bionic_alloc(s);
     return r;
 }
@@ -185,7 +210,48 @@ void *__libc_calloc(size_t m, size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
-    void *r = calloc(m, n);
+    void *r = real_calloc(m, n);
+    leave_bionic_alloc(s);
+    return r;
+}
+
+// ── Exported malloc / free / realloc / calloc ────────────────────────────
+// musl-compiled .so files (e.g. HAP native libs) resolve these against
+// libb.so (which hot-patches libc.so).  Without these exports, calls would
+// fall through to bionic's scudo directly, bypassing the TLS swap and
+// causing tagged-pointer mismatches on worker threads.
+
+void *malloc(size_t n)
+{
+    uintptr_t s;
+    enter_bionic_alloc(&s);
+    void *p = real_malloc(n);
+    leave_bionic_alloc(s);
+    return p;
+}
+
+void free(void *p)
+{
+    uintptr_t s;
+    enter_bionic_alloc(&s);
+    real_free(p);
+    leave_bionic_alloc(s);
+}
+
+void *realloc(void *p, size_t n)
+{
+    uintptr_t s;
+    enter_bionic_alloc(&s);
+    void *r = real_realloc(p, n);
+    leave_bionic_alloc(s);
+    return r;
+}
+
+void *calloc(size_t m, size_t n)
+{
+    uintptr_t s;
+    enter_bionic_alloc(&s);
+    void *r = real_calloc(m, n);
     leave_bionic_alloc(s);
     return r;
 }
