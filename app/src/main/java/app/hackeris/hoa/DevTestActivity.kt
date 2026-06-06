@@ -182,7 +182,7 @@ class DevTestActivity : AppCompatActivity() {
             return
         }
 
-        val slot = ProcessSlotManager.allocateSlot(this)
+        val slot = ProcessSlotManager.allocateSlot(this, File(filesDir, "hap/$bundle.$module").absolutePath)
         if (slot < 0) {
             Toast.makeText(this, getString(R.string.toast_slots_full_fmt, ProcessSlotManager.MAX_SLOTS), Toast.LENGTH_LONG).show()
             Log.w(TAG, "All process slots occupied")

@@ -415,7 +415,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchHap(hap: InstalledHap) {
-        val slot = ProcessSlotManager.allocateSlot(this)
+        val slot = ProcessSlotManager.allocateSlot(this, hap.contentDir.absolutePath)
         if (slot < 0) {
             AlertDialog.Builder(this)
                 .setTitle(getString(R.string.dialog_no_slots_title))

@@ -3,6 +3,8 @@ package app.hackeris.hoa
 import android.webkit.WebView
 import app.hackeris.hoa.logging.LogWriter
 import ohos.stage.ability.adapter.StageApplication
+import ohos.stage.ability.adapter.StageApplicationDelegate
+import java.io.File
 
 class HoaApplication : StageApplication() {
 
@@ -126,6 +128,12 @@ class HoaApplication : StageApplication() {
             LogWriter.e(TAG, "System.loadLibrary(\"hms_iap\") — FAILED", e)
         }
 
+        // ——— HOA: redirect storage (Preferences/RDB/KV Store) to per-HAP dir ———
+        // By default ArkUI-X sets filesDir to the app-level path so all HAPs
+        // share files/preference/, files/database/, etc.  We override with the
+        // HAP module directory so each HAP gets its own isolated data sandbox.
+        redirectStorageToHapModule()
+
         try {
             super.onCreate()
             initSuccess = true
@@ -152,6 +160,50 @@ class HoaApplication : StageApplication() {
     private fun isHapProcess(): Boolean {
         val name = currentProcessName()
         return name.contains(":hap")
+    }
+
+    /**
+     * Redirect ArkUI-X storage (Preferences, RDB, KV Store) from the shared
+     * app-level filesDir to the per-HAP module directory.
+     *
+     * Without this, all HAPs share files/preference/, files/database/, etc.
+     * and a store named "settings" in two different HAPs would conflict.
+     *
+     * Called BEFORE [super.onCreate] so that createStagePath() picks up
+     * the HAP-specific data directory.
+     */
+    private fun redirectStorageToHapModule() {
+        val procName = currentProcessName()
+        val slot = extractSlot(procName)
+        if (slot < 0) {
+            LogWriter.w(TAG, "redirectStorageToHapModule: cannot parse slot from '$procName'")
+            return
+        }
+
+        val contentDir = ProcessSlotManager.getContentDir(this, slot)
+        if (contentDir == null) {
+            LogWriter.w(TAG, "redirectStorageToHapModule: no contentDir for slot $slot — " +
+                "slot may not have been allocated with contentDir yet")
+            return
+        }
+
+        // Ensure storage subdirectories exist under the HAP module dir
+        for (sub in arrayOf("temp", "files", "preference", "database")) {
+            File(contentDir, sub).mkdirs()
+        }
+
+        StageApplicationDelegate.sModuleDataDir = contentDir
+        LogWriter.e(TAG, "redirectStorageToHapModule: data dir → $contentDir")
+    }
+
+    /**
+     * Extracts the slot number from a HAP process name like
+     * "app.hackeris.hoa:hap3" → 3.  Returns -1 on failure.
+     */
+    private fun extractSlot(procName: String): Int {
+        val idx = procName.lastIndexOf(":hap")
+        if (idx < 0) return -1
+        return procName.substring(idx + 4).toIntOrNull() ?: -1
     }
 
     private fun currentProcessName(): String {

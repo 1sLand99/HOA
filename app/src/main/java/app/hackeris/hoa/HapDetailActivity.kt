@@ -145,7 +145,7 @@ class HapDetailActivity : AppCompatActivity() {
     }
 
     private fun launchHap() {
-        val slot = ProcessSlotManager.allocateSlot(this)
+        val slot = ProcessSlotManager.allocateSlot(this, contentDir.absolutePath)
         if (slot < 0) {
             Toast.makeText(this, getString(R.string.toast_slots_full_fmt, ProcessSlotManager.MAX_SLOTS), Toast.LENGTH_LONG).show()
             return

@@ -146,7 +146,8 @@ export MUSL=$ARKUI_X_SRC/third_party/musl
 ```bash
 # 仅 libb.so (修改了 bridge 代码)
 cd app/src/main/cpp
-MUSL=/data/share/hoa2/arkui-x/third_party/musl bash build_musl_bridge.sh
+MUSL=$ARKUI_X_SRC/third_party/musl bash build_musl_bridge.sh
+cd /src/HOA && ./gradlew assembleDebug
 
 # 仅 APK (修改了 Java/Kotlin 或 libb.so)
 ./gradlew assembleDebug

@@ -16,8 +16,9 @@ open class HoaAbilityActivity : StageActivity() {
         val slot = intent.getIntExtra("PROCESS_SLOT", -1)
 
         if (slot >= 0) {
-            ProcessSlotManager.claimSlot(this, slot)
-            Log.e(TAG, "Process slot $slot claimed, PID=${android.os.Process.myPid()}")
+            val contentDir = java.io.File(filesDir, "hap/$bundleName.$moduleName").absolutePath
+            ProcessSlotManager.claimSlot(this, slot, contentDir)
+            Log.e(TAG, "Process slot $slot claimed, PID=${android.os.Process.myPid()}, contentDir=$contentDir")
         }
 
         val instanceName = "$bundleName:$moduleName:$abilityName:"
