@@ -188,7 +188,7 @@ class HoaApplication : StageApplication() {
         }
 
         // Ensure storage subdirectories exist under the HAP module dir
-        for (sub in arrayOf("temp", "files", "preference", "database")) {
+        for (sub in arrayOf("temp", "files", "preference", "database", "cache")) {
             File(contentDir, sub).mkdirs()
         }
 
