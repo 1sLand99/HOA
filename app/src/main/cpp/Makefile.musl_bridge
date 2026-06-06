@@ -38,7 +38,7 @@ CFLAGS_COMMON := \
     -D__ANDROID__ \
     -D__HISPARK_LINUX__ \
     -D_GNU_SOURCE \
-    -O0 \
+    -O2 \
     -g \
     -ffunction-sections \
     -fdata-sections \
