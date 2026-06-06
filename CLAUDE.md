@@ -247,7 +247,12 @@ HOA 实现了 OHOS HDC daemon（TCP 8710 端口），使 DevEco Studio 可将 HO
 
 ## 已知问题
 
-1. **DOSBox-X (zbox) 非确定性崩溃**: zbox 自身 Config/Section_prop/Value 存在堆缓冲区溢出，非 HOA bug。当前版本可正常运行。
+1. **DOSBox-X (zbox) 堆内存破坏 (2026-06-06 深度诊断)**:
+   - **现象**: zbox 在 HOA 上崩溃率 ~85-100%，崩溃位置随机（libbinder、libc.so strcasecmp、libarkui_android.so、jemalloc extent tree 等）
+   - **根因**: zbox 自身存在 double-free 和 use-after-free 问题（非 buffer overflow），通过 `malloc_bridge.c` 中 `-DMALLOC_CANARY_DEBUG` 的 heap canary 检测到 FRONT canary 被破坏（值出现 0xffffffffffffffff、0x0000000000000001 等），但 TAIL canary 从未被触发
+   - **排除 libb.so**: 15/15 次崩溃中 libb.so 仅在 #15 帧作为线程入口出现，不在任何活跃崩溃栈中。jemalloc extent tree 崩溃表明堆元数据被 zbox 代码破坏
+   - **诊断工具**: `malloc_bridge.c` 内置 `MALLOC_CANARY_DEBUG` 宏，启用后每个 malloc/free 加 header+footer canary，在 free 时检测 double-free、underflow、overflow。启用方式：`Makefile.musl_bridge` 的 `CFLAGS_BRIDGE` 添加 `-DMALLOC_CANARY_DEBUG`
+   - **故障地址特征**: 多次崩溃的 fault addr 解码为 ASCII 字符串片段（`[33-32-9`、`A32 colu`、`Files=tk`），指向 zbox 配置解析代码
 2. **Scudo 兼容性**: 不同 Android 版本/厂商的 scudo 版本差异可能导致 TLS slot 初始化行为不同。
 3. **dlsym(RTLD_NEXT) 厂商差异**: 部分厂商 dynamic linker 对 RTLD_NEXT 实现不同。
 4. **内存压力**: 每个 HAP 启动一个独立进程，多 HAP 同时运行内存压力较大。

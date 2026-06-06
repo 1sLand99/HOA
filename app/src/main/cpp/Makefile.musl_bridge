@@ -23,6 +23,7 @@ CFLAGS_MUSL := \
     -isystem $(SYSROOT)/usr/include/aarch64-linux-android
 
 # ── Bridge sources (NDK only, NO musl headers) ────────────────────────
+# Add -DMALLOC_CANARY_DEBUG for heap corruption detection (debug only)
 CFLAGS_BRIDGE := \
     -isystem $(SYSROOT)/usr/include \
     -isystem $(SYSROOT)/usr/include/aarch64-linux-android

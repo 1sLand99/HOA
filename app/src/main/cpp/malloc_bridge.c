@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <string.h>
 #include <sys/syscall.h>
 #include <linux/futex.h>
 #include <android/log.h>
@@ -10,34 +11,122 @@
 #define BRIDGE_LOG(fmt, ...) \
     __android_log_print(ANDROID_LOG_ERROR, "malloc_bridge", fmt, ##__VA_ARGS__)
 
-// Bridge musl's internal allocator entry points to bionic jemalloc/scudo.
+// ── Heap canary debugging ─────────────────────────────────────────────────
+// Each allocation gets a header (size + front canary) and a tail canary.
+// On free(), both canaries are checked. If corrupted, the overflow is caught
+// at the moment of free — not later when corrupted metadata causes a crash.
 //
-// On musl-created threads, tpidr_el0 points to the musl TLS area.  Bionic's
-// scudo writes allocator state to tpidr_el0[6] (TLS_SLOT_SANITIZER), which
-// would overwrite musl's tls_slots[] region.  We swap to a per-thread bionic
-// TLS block so each musl thread gets its own scudo per-thread cache.
-//
-// The main thread's bionic_tp is captured at init and used only as a one-shot
-// bootstrap when allocating a new TLS block for a musl thread.
-//
-// malloc / free / realloc / calloc are also exported so that musl-compiled
-// .so files (e.g. libentry.so inside a HAP) resolve those symbols to libb.so
-// instead of falling through to bionic's libc.so.  Without this, worker
-// threads would call bionic's scudo directly without the TLS swap and crash
-// on tagged-pointer mismatches.
+// Forward declarations of real_* pointers (defined below, resolved at init).
+static void *(*real_malloc)(size_t) = NULL;
+static void (*real_free)(void *) = NULL;
+static void *(*real_realloc)(void *, size_t) = NULL;
+static void *(*real_calloc)(size_t, size_t) = NULL;
+
+#ifdef MALLOC_CANARY_DEBUG
+
+#define CANARY_FRONT_MAGIC 0xCAFEF00DDEADBEEFULL
+#define CANARY_TAIL_MAGIC  0x8BADF00D5CAFFEEDULL
+
+typedef struct {
+    size_t  size;            // user-requested size
+    uint64_t front_canary;   // detects underflow
+} canary_header;
+
+typedef struct {
+    uint64_t tail_canary;    // detects overflow
+} canary_footer;
+
+static void *malloc_canary(size_t n)
+{
+    size_t total = sizeof(canary_header) + n + sizeof(canary_footer);
+    canary_header *hdr = (canary_header *)real_malloc(total);
+    if (!hdr) return NULL;
+    hdr->size = n;
+    hdr->front_canary = CANARY_FRONT_MAGIC;
+    char *user_ptr = (char *)(hdr + 1);
+    canary_footer *ftr = (canary_footer *)(user_ptr + n);
+    ftr->tail_canary = CANARY_TAIL_MAGIC;
+    return user_ptr;
+}
+
+static void free_canary(void *p)
+{
+    if (!p) return;
+    canary_header *hdr = ((canary_header *)p) - 1;
+
+    if (hdr->front_canary != CANARY_FRONT_MAGIC) {
+        BRIDGE_LOG("*** HEAP-CORRUPT *** free(%p): FRONT canary=0x%016llx expected=0x%016llx (underflow or double-free)",
+                   p, (unsigned long long)hdr->front_canary, (unsigned long long)CANARY_FRONT_MAGIC);
+        __builtin_trap();
+    }
+
+    canary_footer *ftr = (canary_footer *)((char *)p + hdr->size);
+    if (ftr->tail_canary != CANARY_TAIL_MAGIC) {
+        BRIDGE_LOG("*** HEAP-CORRUPT *** free(%p) size=%zu: TAIL canary=0x%016llx expected=0x%016llx (overflow!)",
+                   p, hdr->size, (unsigned long long)ftr->tail_canary, (unsigned long long)CANARY_TAIL_MAGIC);
+        // dump tail bytes
+        BRIDGE_LOG("*** HEAP-CORRUPT *** tail bytes: %02x %02x %02x %02x %02x %02x %02x %02x "
+                   " %02x %02x %02x %02x %02x %02x %02x %02x",
+                   ((unsigned char *)ftr)[0], ((unsigned char *)ftr)[1], ((unsigned char *)ftr)[2],
+                   ((unsigned char *)ftr)[3], ((unsigned char *)ftr)[4], ((unsigned char *)ftr)[5],
+                   ((unsigned char *)ftr)[6], ((unsigned char *)ftr)[7], ((unsigned char *)ftr)[8],
+                   ((unsigned char *)ftr)[9], ((unsigned char *)ftr)[10], ((unsigned char *)ftr)[11],
+                   ((unsigned char *)ftr)[12], ((unsigned char *)ftr)[13], ((unsigned char *)ftr)[14],
+                   ((unsigned char *)ftr)[15]);
+        __builtin_trap();
+    }
+
+    // wipe canaries to catch double-free
+    hdr->front_canary = 0;
+    ftr->tail_canary = 0;
+    real_free(hdr);
+}
+
+static void *realloc_canary(void *p, size_t n)
+{
+    if (!p) return malloc_canary(n);
+
+    canary_header *hdr = ((canary_header *)p) - 1;
+    if (hdr->front_canary != CANARY_FRONT_MAGIC) {
+        BRIDGE_LOG("*** HEAP-CORRUPT *** realloc(%p): FRONT canary=0x%016llx", p, (unsigned long long)hdr->front_canary);
+        __builtin_trap();
+    }
+
+    canary_footer *ftr = (canary_footer *)((char *)p + hdr->size);
+    if (ftr->tail_canary != CANARY_TAIL_MAGIC) {
+        BRIDGE_LOG("*** HEAP-CORRUPT *** realloc(%p) size=%zu: TAIL canary corrupted", p, hdr->size);
+        __builtin_trap();
+    }
+
+    // wipe old
+    hdr->front_canary = 0;
+    ftr->tail_canary = 0;
+
+    size_t total = sizeof(canary_header) + n + sizeof(canary_footer);
+    canary_header *new_hdr = (canary_header *)real_realloc(hdr, total);
+    if (!new_hdr) return NULL;
+    new_hdr->size = n;
+    new_hdr->front_canary = CANARY_FRONT_MAGIC;
+    char *user_ptr = (char *)(new_hdr + 1);
+    canary_footer *new_ftr = (canary_footer *)(user_ptr + n);
+    new_ftr->tail_canary = CANARY_TAIL_MAGIC;
+    return user_ptr;
+}
+
+static void *calloc_canary(size_t m, size_t n)
+{
+    size_t total = m * n;
+    void *p = malloc_canary(total);
+    if (p) memset(p, 0, total);
+    return p;
+}
+
+#endif // MALLOC_CANARY_DEBUG
 
 #define BIONIC_TLS_SIZE 64
 #define MAX_TLS_ENTRIES 128
 
 static uintptr_t main_bionic_tp;
-
-// Pointers to bionic's real allocator functions, resolved via dlsym(RTLD_NEXT)
-// at init to avoid PLT recursion (our own malloc/free wrappers are exported
-// from this library, so a plain PLT call would bind to ourselves).
-static void *(*real_malloc)(size_t) = NULL;
-static void (*real_free)(void *) = NULL;
-static void *(*real_realloc)(void *, size_t) = NULL;
-static void *(*real_calloc)(size_t, size_t) = NULL;
 
 static struct {
     pid_t tid;
@@ -184,7 +273,11 @@ void *__libc_malloc_impl(size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    void *p = malloc_canary(n);
+#else
     void *p = real_malloc(n);
+#endif
     leave_bionic_alloc(s);
     return p;
 }
@@ -193,7 +286,11 @@ void __libc_free(void *p)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    free_canary(p);
+#else
     real_free(p);
+#endif
     leave_bionic_alloc(s);
 }
 
@@ -201,7 +298,11 @@ void *__libc_realloc(void *p, size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    void *r = realloc_canary(p, n);
+#else
     void *r = real_realloc(p, n);
+#endif
     leave_bionic_alloc(s);
     return r;
 }
@@ -210,7 +311,11 @@ void *__libc_calloc(size_t m, size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    void *r = calloc_canary(m, n);
+#else
     void *r = real_calloc(m, n);
+#endif
     leave_bionic_alloc(s);
     return r;
 }
@@ -225,7 +330,11 @@ void *malloc(size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    void *p = malloc_canary(n);
+#else
     void *p = real_malloc(n);
+#endif
     leave_bionic_alloc(s);
     return p;
 }
@@ -234,7 +343,11 @@ void free(void *p)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    free_canary(p);
+#else
     real_free(p);
+#endif
     leave_bionic_alloc(s);
 }
 
@@ -242,7 +355,11 @@ void *realloc(void *p, size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    void *r = realloc_canary(p, n);
+#else
     void *r = real_realloc(p, n);
+#endif
     leave_bionic_alloc(s);
     return r;
 }
@@ -251,7 +368,11 @@ void *calloc(size_t m, size_t n)
 {
     uintptr_t s;
     enter_bionic_alloc(&s);
+#ifdef MALLOC_CANARY_DEBUG
+    void *r = calloc_canary(m, n);
+#else
     void *r = real_calloc(m, n);
+#endif
     leave_bionic_alloc(s);
     return r;
 }
