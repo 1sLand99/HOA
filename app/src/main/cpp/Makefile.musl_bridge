@@ -24,6 +24,7 @@ CFLAGS_MUSL := \
 
 # ── Bridge sources (NDK only, NO musl headers) ────────────────────────
 # Add -DMALLOC_CANARY_DEBUG for heap corruption detection (debug only)
+# Add -DMALLOC_PADDING=N to add N bytes of padding per allocation
 CFLAGS_BRIDGE := \
     -isystem $(SYSROOT)/usr/include \
     -isystem $(SYSROOT)/usr/include/aarch64-linux-android
