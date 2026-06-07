@@ -206,6 +206,9 @@
 | `@ohos.intl` | 国际化格式化 | ⚠️ hap-example IntlTest — Locale 正常，DateTimeFormat/NumberFormat 未实现 |
 | `@ohos.util.*` (HashMap/ArrayList/LinkedList) | 数据结构 | ✅ hap-example UtilTest — HashMap/ArrayList 正常 |
 | `@ohos.file.hash` | 文件哈希 | ⚠️ 模块加载正常，算法名格式不兼容 (插件期待 SHA-256 格式) |
+| `@ohos.url` | URL 解析 | ✅ hap-example UrlTest 通过（URLSearchParams/URL 全部正常） |
+| `@ohos.convertxml` | XML→JS 对象 | ✅ hap-example ConvertXmlTest 通过 |
+| `@ohos.buffer` | 二进制数据 | ✅ hap-example BufferTest 通过（alloc/byteLength 正常） |
 | `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 | 未验证 |
 | `@ohos.wifiManager` | 走 Android Wi-Fi API | 未验证 |
 | `@ohos.geoLocationManager` | 走 Android Location API | 未验证 |
