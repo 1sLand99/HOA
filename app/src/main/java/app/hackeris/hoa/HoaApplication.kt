@@ -128,6 +128,15 @@ class HoaApplication : StageApplication() {
             LogWriter.e(TAG, "System.loadLibrary(\"hms_iap\") — FAILED", e)
         }
 
+        // Pre-load @ohos.settings stub so NAPI module "settings" is registered
+        // before any HAP tries to import it.
+        try {
+            System.loadLibrary("settings_napi")
+            LogWriter.e(TAG, "System.loadLibrary(\"settings_napi\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            LogWriter.e(TAG, "System.loadLibrary(\"settings_napi\") — FAILED", e)
+        }
+
         // ——— HOA: redirect storage (Preferences/RDB/KV Store) to per-HAP dir ———
         // By default ArkUI-X sets filesDir to the app-level path so all HAPs
         // share files/preference/, files/database/, etc.  We override with the

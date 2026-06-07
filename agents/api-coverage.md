@@ -219,7 +219,7 @@
 | `@ohos.security.huks` | 通用密钥管理 (HUKS) — 加密、签名、密钥存储。 | 高 |
 | `@ohos.rpc` | IPC/RPC 通信 — WantAgent 和 ability 间通信依赖。 | 高 |
 | `@ohos.bundle.bundleManager` | 包管理 — 查询已安装 HAP 信息。HOA 已有 Java 实现可桥接。 | 中 |
-| `@ohos.settings` | 设置存储 — 系统级 key-value 配置。 | 低 |
+| `@ohos.settings` | 设置存储 — 系统级 key-value 配置。**已实现** (2026-06-07) — `settings_stub.c` + CMake `libsettings_napi.so`。 | 低 |
 | `@ohos.backgroundTaskManager` | 后台任务管理。 | 中 |
 | `@ohos.sensor` | 传感器 — 加速度、陀螺仪、光线等。 | 中 |
 | `@ohos.inputMethod` | 输入法 — 软键盘控制、输入法切换。 | 中 |
