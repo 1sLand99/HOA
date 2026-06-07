@@ -1,6 +1,16 @@
 #include <errno.h>
 #include <stddef.h>
 
+/* SA_RESTORER — must match kernel UAPI (not exposed by musl on all archs) */
+#ifndef SA_RESTORER
+#define SA_RESTORER 0x04000000
+#endif
+
+/* Provided by musl src/signal/aarch64/restore.s (compiled into libb.so).
+ * Both labels are at the same address; the function executes rt_sigreturn. */
+extern void __restore_rt(void);
+extern void __restore(void);
+
 /*
  * HAP .so is compiled with OHOS SDK (musl headers).  struct sigaction layout:
  *   offset 0: union { void (*sa_handler)(int);
@@ -8,16 +18,22 @@
  *   offset 8: unsigned long sa_mask[2]   (musl sigset_t, _NSIG=65)
  *   offset 24: int sa_flags + 4 pad
  *   offset 32: void (*sa_restorer)(void)
- * total: 40 bytes, sa_handler FIRST (unlike bionic where sa_flags is first).
+ * total: 40 bytes.
  *
  * The kernel struct on aarch64 is:
  *   offset 0: sa_handler (8 bytes)
  *   offset 8: sa_flags   (8 bytes)
  *   offset 16: sa_restorer (8 bytes)
  *   offset 24: sa_mask[1]  (8 bytes, _KERNEL__NSIG=64 -> 1 word)
- * total: 32 bytes, sa_handler also first (matches kernel convention).
+ * total: 32 bytes.
  *
  * We convert from HAP (musl) layout to kernel layout.
+ *
+ * CRITICAL: We must set SA_RESTORER with a proper restorer (__restore_rt
+ * for SA_SIGINFO, __restore for plain handlers).  Without SA_RESTORER,
+ * some Android vendor kernels fail to initialise the siginfo_t pointer
+ * correctly for SA_SIGINFO handlers, passing a corrupted value (e.g.
+ * the ucontext offset 0x80 instead of the siginfo address).
  */
 struct kernel_sigaction {
     void (*sa_handler)(int);
@@ -62,7 +78,7 @@ int sigaction(int sig, const struct sigaction *restrict act, struct sigaction *r
     struct hap_sigaction *hap_old = (struct hap_sigaction *)old;
 
     /* musl reserves signals 32-34 (SIGCANCEL/SIGSYNCCALL/SIGTIMER);
-       signals ≥ 64 exceed _KERNEL__NSIG */
+       signals >= 64 exceed _KERNEL__NSIG */
     if (sig - 32U < 3 || sig - 1U >= (unsigned)(8*sizeof(unsigned long)) - 1) {
         errno = EINVAL;
         return -1;
@@ -72,7 +88,13 @@ int sigaction(int sig, const struct sigaction *restrict act, struct sigaction *r
         ksa.sa_handler  = hap_act->sa_handler;
         ksa.sa_flags    = (unsigned long)(unsigned int)hap_act->sa_flags;
         ksa.sa_mask[0]  = hap_act->sa_mask[0];
-        ksa.sa_restorer = NULL;
+
+        /* Always set SA_RESTORER with the proper restorer, matching musl's
+         * own sigaction.c.  Both __restore_rt and __restore resolve to the
+         * same rt_sigreturn trampoline in musl src/signal/aarch64/restore.s. */
+        ksa.sa_flags   |= SA_RESTORER;
+        ksa.sa_restorer = (hap_act->sa_flags & 0x00000004 /* SA_SIGINFO */)
+                          ? __restore_rt : __restore;
     }
 
     long r = _sig_syscall(134 /* SYS_rt_sigaction */,
