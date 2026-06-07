@@ -203,6 +203,9 @@
 | `@ohos.display` | 走 Android Display API | ✅ hap-example DisplayTest 通过（width/height/density 正常，部分属性未实现） |
 | `@ohos.process` | 进程信息 | ✅ hap-example ProcessTest 通过（pid/tid/uid/is64Bit 正常，isIsolatedProcess=true） |
 | `@ohos.i18n` | 国际化/区域信息 | ⚠️ hap-example I18nTest — getSystemLanguage 正常，getSystemRegion/getSystemLocale 未实现 |
+| `@ohos.intl` | 国际化格式化 | ⚠️ hap-example IntlTest — Locale 正常，DateTimeFormat/NumberFormat 未实现 |
+| `@ohos.util.*` (HashMap/ArrayList/LinkedList) | 数据结构 | ✅ hap-example UtilTest — HashMap/ArrayList 正常 |
+| `@ohos.file.hash` | 文件哈希 | ⚠️ 模块加载正常，算法名格式不兼容 (插件期待 SHA-256 格式) |
 | `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 | 未验证 |
 | `@ohos.wifiManager` | 走 Android Wi-Fi API | 未验证 |
 | `@ohos.geoLocationManager` | 走 Android Location API | 未验证 |
