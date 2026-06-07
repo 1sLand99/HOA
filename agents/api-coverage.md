@@ -141,7 +141,16 @@
 | `@ohos.effectKit` | libeffectkit.so | 特效 |
 | `@ohos.web.webview` | libweb_webview.so | WebView |
 
-### 1.10 ArkUI 高级组件
+### 1.10 ArkUI 框架层 API（StageApplication 内置）
+
+这些 API 由 ArkUI-X 的 StageApplication/StageAssetProvider 在框架层实现，不需要独立 .so：
+
+| OHOS API | 实现方式 | 说明 |
+|----------|---------|------|
+| `@ohos.window` | StageApplication | WindowStage、loadContent、窗口生命周期等核心 API 已工作。EntryAbility 的 onWindowStageCreate 正常回调 |
+| `@ohos.resourceManager` | StageAssetProvider | `$r()` 资源引用、系统资源发现（systemres ABC）通过 StageAssetProvider 实现，19 个 hap-example 测试页面均正常使用 |
+
+### 1.11 ArkUI 高级组件
 
 | OHOS API | so 文件 |
 |----------|---------|
@@ -167,7 +176,7 @@
 | `@ohos.arkui.advanced.ToolBar` | libarkui_advanced_toolbar.so |
 | `@ohos.arkui.advanced.TreeView` | libarkui_advanced_treeview.so |
 
-### 1.11 Browser/ArkTS 内建模块
+### 1.12 Browser/ArkTS 内建模块
 
 | 模块 | 说明 |
 |------|------|
@@ -179,22 +188,28 @@
 
 ## 二、已支持但需验证的 API
 
-这些 API 有对应的 .so 文件，但在 HAP 实际运行时可能存在问题：
+这些 API 有对应的 .so 文件，但部分可能仅在 HAP 实际运行时存在问题：
 
-| OHOS API | 潜在问题 |
-|----------|---------|
-| `@ohos.router` | 路由栈管理可能与 OHOS 不同，back/push 行为需验证 |
-| `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 |
-| `@ohos.wifiManager` | 同上，走 Android Wi-Fi API |
-| `@ohos.geoLocationManager` | 走 Android Location API |
-| `@ohos.notificationManager` | 走 Android Notification API |
-| `@ohos.data.relationalStore` | OHOS RDB 在 Android 上可能有兼容问题 |
-| `@ohos.data.preferences` | 同上 |
-| `@ohos.pasteboard` | 依赖 Android Clipboard API |
-| `@ohos.runningLock` | 可能空实现 |
-| `@ohos.net.socket` | UDP/TCP socket 一般没问题 |
-| `@ohos.multimedia.audio` | 走 Android Audio API，能力集不同 |
-| `@ohos.multimedia.media` | 走 Android MediaPlayer/MediaCodec |
+| OHOS API | 潜在问题 | 验证状态 |
+|----------|---------|---------|
+| `@ohos.router` | 路由栈管理可能与 OHOS 不同，back/push 行为需验证 | ✅ hap-example NavigationTest 通过 |
+| `@ohos.data.preferences` | OHOS Preferences 在 Android 上可能有兼容问题 | ✅ hap-example PreferencesTest 通过 |
+| `@ohos.data.relationalStore` | OHOS RDB 在 Android 上可能有兼容问题 | ✅ hap-example RelationalStoreTest 通过 |
+| `@ohos.data.distributedKVStore` | 分布式 KV 在单机上的行为 | ✅ hap-example KVStoreTest 通过 |
+| `@ohos.file.picker` | 走 Android SAF，UI 交互不同 | ✅ hap-example FilePickerTest 通过 |
+| `@ohos.web.webview` | 底层走 Android WebView，能力集不同 | ✅ hap-example WebViewTest 通过 |
+| `@ohos.settings` | 桩实现，仅内存 KV 存储 | ✅ hap-example SettingsTest 通过 |
+| `@ohos.deviceInfo` | 走 Android Build 类 | ✅ hap-example DeviceInfoTest 通过，35 属性均可读 |
+| `@ohos.display` | 走 Android Display API | 未验证 |
+| `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 | 未验证 |
+| `@ohos.wifiManager` | 走 Android Wi-Fi API | 未验证 |
+| `@ohos.geoLocationManager` | 走 Android Location API | 未验证 |
+| `@ohos.notificationManager` | 走 Android Notification API | 未验证 |
+| `@ohos.pasteboard` | 依赖 Android Clipboard API | 未验证 |
+| `@ohos.runningLock` | 可能空实现 | 未验证 |
+| `@ohos.net.socket` | UDP/TCP socket 一般没问题 | 未验证 |
+| `@ohos.multimedia.audio` | 走 Android Audio API，能力集不同 | 未验证 |
+| `@ohos.multimedia.media` | 走 Android MediaPlayer/MediaCodec | 未验证 |
 
 ---
 
@@ -204,8 +219,6 @@
 
 | OHOS API | 说明 | 难度 |
 |----------|------|------|
-| `@ohos.window` | 窗口管理 — 状态栏、导航栏、窗口尺寸、全屏等。**几乎所有应用都会调用**。 | 高 |
-| `@ohos.resourceManager` | 资源管理 — `$r()` 底层 API，虽然 ArkUI-X 有自己的 AssetProvider，但 OHOS resourceManager API 未暴露。 | 中 |
 | `@ohos.app.ability.UIAbility` | UIAbility 基类 — ArkUI-X 的 StageApplication 已部分实现，但完整的 UIAbility 生命周期回调 API 未暴露给 ArkTS。 | 高 |
 | `@ohos.app.ability.common` | 应用上下文类型 — UIAbilityContext, ApplicationContext 等类型定义。 | 中 |
 | `@ohos.app.ability.wantAgent` | Want 代理 — 启动 Ability、发送 Want 的能力。 | 中 |
@@ -297,16 +310,16 @@
 
 基于典型 HAP 应用的实际依赖，建议按以下顺序扩展：
 
-1. **`@ohos.window`** — 几乎所有应用调用 `window.getLastWindow()` 来设置状态栏/全屏
-2. **`@ohos.resourceManager`** — `$r()` 和 `getContext().resourceManager` 的底层 API
-3. **`@ohos.app.ability.*` (UIAbility/AbilityContext/Want)** — 补齐 Ability 生命周期和启动能力
-4. **`@ohos.multimedia.image`** — 图片编解码
+1. **`@ohos.bundle.bundleManager`** — HOA 已有 Java 侧实现 (HapBundleLoader/HapInstaller)，可做 JNI 桥接，中等难度
+2. **`@ohos.web.netErrorList`** — WebView 已支持，仅需补充类型声明，极低难度
+3. **`@ohos.multimedia.image`** — 图片编解码，常用
+4. **`@ohos.app.ability.*` (UIAbility/AbilityContext/Want)** — 补齐 Ability 生命周期和启动能力
 5. **`@ohos.security.huks`** — 加密/签名（金融、登录类应用依赖）
 6. **`@ohos.rpc`** — IPC 通信基础（很多系统 API 依赖它）
-7. **`@ohos.bundle.bundleManager`** — HOA 已有 Java 侧实现，可做 JNI 桥接
-8. **`@ohos.settings`** — 低难度、常用
-9. **`@ohos.sensor`** — 中等难度、常用
-10. **`@ohos.inputMethod`** — 软键盘控制
+7. **`@ohos.sensor`** — 中等难度、常用
+8. **`@ohos.inputMethod`** — 软键盘控制
+
+> **已从列表移除**: `@ohos.window` 和 `@ohos.resourceManager` — 核心功能已通过 ArkUI-X StageApplication/StageAssetProvider 工作，hap-example 19 个测试页面验证通过。
 
 ---
 
