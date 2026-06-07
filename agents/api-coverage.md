@@ -212,6 +212,9 @@
 | `@ohos.file.fs` | 文件系统操作 | ✅ hap-example FileFsTest 通过（listFile/stat/mkdir 全部正常） |
 | `@ohos.events.emitter` | 事件发射器 | ✅ hap-example EmitterTest 通过（on/emit 回调正常） |
 | `@ohos.net.http` | HTTP 请求 | ⚠️ 模块加载/createHttp 正常，网络请求超时（需设备网络） |
+| `@ohos.vibrator` | 走 Android VibratorManager，需要设备有振动马达 | ⚠️ hap-example VibratorTest — 模块加载正常，API 调用正常，但平板无振动马达报错 |
+| `@ohos.file.statvfs` | 文件系统空间统计 | ✅ hap-example StatvfsTest 通过（getFreeSizeSync/getTotalSizeSync 正常） |
+| `@ohos.net.connection` | 网络连接状态 | ⚠️ hap-example NetConnectionTest — getDefaultNetSync 正常，部分 API 未实现（undefined is not callable） |
 | `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 | 未验证 |
 | `@ohos.wifiManager` | 走 Android Wi-Fi API | 未验证 |
 | `@ohos.geoLocationManager` | 走 Android Location API | 未验证 |
