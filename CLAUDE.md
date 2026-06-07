@@ -253,6 +253,13 @@ HOA 实现了 OHOS HDC daemon（TCP 8710 端口），使 DevEco Studio 可将 HO
    - **排除 libb.so**: 15/15 次崩溃中 libb.so 仅在 #15 帧作为线程入口出现，不在任何活跃崩溃栈中。jemalloc extent tree 崩溃表明堆元数据被 zbox 代码破坏
    - **诊断工具**: `malloc_bridge.c` 内置 `MALLOC_CANARY_DEBUG` 宏，启用后每个 malloc/free 加 header+footer canary，在 free 时检测 double-free、underflow、overflow。启用方式：`Makefile.musl_bridge` 的 `CFLAGS_BRIDGE` 添加 `-DMALLOC_CANARY_DEBUG`
    - **故障地址特征**: 多次崩溃的 fault addr 解码为 ASCII 字符串片段（`[33-32-9`、`A32 colu`、`Files=tk`），指向 zbox 配置解析代码
+5. **native-example 信号崩溃 (已修复, 2026-06-05)**:
+   - **现象1 (sigqueue_action)**: SIGUSR2 handler 收到 siginfo_t 指针 0x80 (=128=sizeof(siginfo_t))，ldr w8,[x8,#0x18] 崩溃在 `info->si_value.sival_int`
+   - **根因1**: OHOS clang (C++ mode) 的 designated initializer bug — 当 struct sigaction 用 `.sa_sigaction=..., .sa_flags=SA_SIGINFO` 初始化但跳过 sa_mask 成员时，compiler 忽略 `.sa_flags` 赋值，导致 SA_SIGINFO 未设置。kernel 按单参数 handler 调用，x1 寄存器不是 siginfo_t* 而是 ucontext 偏移。
+   - **根因2**: signal_bridge.c 未设置 SA_RESTORER flag。没有 SA_RESTORER 时，某些 Android vendor kernel 的 VDSO 默认 restorer 会损坏 siginfo_t 指针。
+   - **修复**: (1) native-example 所有 sigaction 改用显式成员赋值替代 designated initializer；(2) signal_bridge.c 始终设置 SA_RESTORER，restorer 根据 SA_SIGINFO 选择 __restore_rt/__restore（对齐 musl sigaction.c）。
+   - **现象2 (sigsuspend)**: intermittent sp≈0x88 栈指针损坏 — 后确认是测试脚本误报（等待时间不足 4s）。
+
 2. **Scudo 兼容性**: 不同 Android 版本/厂商的 scudo 版本差异可能导致 TLS slot 初始化行为不同。
 3. **dlsym(RTLD_NEXT) 厂商差异**: 部分厂商 dynamic linker 对 RTLD_NEXT 实现不同。
 4. **内存压力**: 每个 HAP 启动一个独立进程，多 HAP 同时运行内存压力较大。
