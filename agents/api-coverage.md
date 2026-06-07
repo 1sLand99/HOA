@@ -200,7 +200,9 @@
 | `@ohos.web.webview` | 底层走 Android WebView，能力集不同 | ✅ hap-example WebViewTest 通过 |
 | `@ohos.settings` | 桩实现，仅内存 KV 存储 | ✅ hap-example SettingsTest 通过 |
 | `@ohos.deviceInfo` | 走 Android Build 类 | ✅ hap-example DeviceInfoTest 通过，35 属性均可读 |
-| `@ohos.display` | 走 Android Display API | 未验证 |
+| `@ohos.display` | 走 Android Display API | ✅ hap-example DisplayTest 通过（width/height/density 正常，部分属性未实现） |
+| `@ohos.process` | 进程信息 | ✅ hap-example ProcessTest 通过（pid/tid/uid/is64Bit 正常，isIsolatedProcess=true） |
+| `@ohos.i18n` | 国际化/区域信息 | ⚠️ hap-example I18nTest — getSystemLanguage 正常，getSystemRegion/getSystemLocale 未实现 |
 | `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 | 未验证 |
 | `@ohos.wifiManager` | 走 Android Wi-Fi API | 未验证 |
 | `@ohos.geoLocationManager` | 走 Android Location API | 未验证 |
