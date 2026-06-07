@@ -209,6 +209,9 @@
 | `@ohos.url` | URL 解析 | ✅ hap-example UrlTest 通过（URLSearchParams/URL 全部正常） |
 | `@ohos.convertxml` | XML→JS 对象 | ✅ hap-example ConvertXmlTest 通过 |
 | `@ohos.buffer` | 二进制数据 | ✅ hap-example BufferTest 通过（alloc/byteLength 正常） |
+| `@ohos.file.fs` | 文件系统操作 | ✅ hap-example FileFsTest 通过（listFile/stat/mkdir 全部正常） |
+| `@ohos.events.emitter` | 事件发射器 | ✅ hap-example EmitterTest 通过（on/emit 回调正常） |
+| `@ohos.net.http` | HTTP 请求 | ⚠️ 模块加载/createHttp 正常，网络请求超时（需设备网络） |
 | `@ohos.bluetooth.*` | 底层调用 Android Bluetooth API 而非 OHOS Bluetooth，profile 可能空实现 | 未验证 |
 | `@ohos.wifiManager` | 走 Android Wi-Fi API | 未验证 |
 | `@ohos.geoLocationManager` | 走 Android Location API | 未验证 |
