@@ -40,8 +40,12 @@ object UpdateChecker {
                     val hasUpdate = if (latest.versionCode != null) {
                         latest.versionCode > localCode
                     } else {
+                        // Fallback: compare dates at day granularity, not exact time.
+                        // This avoids false positives when release is same day as local build.
                         val currentDate = parseVersionDate(localName)
-                        currentDate != null && latest.date != null && latest.date.after(currentDate)
+                        currentDate != null && latest.date != null &&
+                            latest.date.after(currentDate) &&
+                            !isSameDay(latest.date, currentDate)
                     }
 
                     if (hasUpdate) {
@@ -130,13 +134,24 @@ object UpdateChecker {
                     obj.optString("created_at")
                 }).take(19)
                 val date = dateParser.parse(dateStr) ?: continue
-                val code = parseVersionCode(name)
+
+                // Try name first, then tag_name for version code (both may have prefix)
+                var code = parseVersionCode(name)
+                if (code == null) {
+                    val tagName = obj.optString("tag_name")
+                    if (tagName.isNotEmpty()) {
+                        code = parseVersionCode(tagName)
+                    }
+                }
+
                 list.add(ReleaseInfo(name = name, versionCode = code, date = date))
             }
 
             if (list.isEmpty()) return null
 
-            list.sortByDescending { it.date }
+            // Sort by versionCode first (when available), then by date
+            list.sortWith(compareByDescending<ReleaseInfo> { it.versionCode ?: 0 }
+                .thenByDescending { it.date })
             list[0]
         } catch (_: Exception) {
             null
@@ -172,5 +187,13 @@ object UpdateChecker {
         } catch (_: Exception) {
             null
         }
+    }
+
+    // Compare two dates at day granularity, ignoring time-of-day.
+    private fun isSameDay(a: java.util.Date, b: java.util.Date): Boolean {
+        val calA = java.util.Calendar.getInstance().apply { time = a }
+        val calB = java.util.Calendar.getInstance().apply { time = b }
+        return calA.get(java.util.Calendar.YEAR) == calB.get(java.util.Calendar.YEAR) &&
+            calA.get(java.util.Calendar.DAY_OF_YEAR) == calB.get(java.util.Calendar.DAY_OF_YEAR)
     }
 }
