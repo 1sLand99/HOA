@@ -163,6 +163,12 @@ if ! $ABC_ONLY && ! $RES_ONLY; then
 
     # A4. Plugin .so — ArkUI-X 跨平台插件库（复制所有 plugins/ 下的 .so）
     log "--- A4: Plugin .so ---"
+
+    # Build plugins not yet integrated into GN (e.g. settings NAPI stub)
+    if [ -f "$ARKUI_X_SRC/plugins/settings/build_settings.sh" ]; then
+        bash "$ARKUI_X_SRC/plugins/settings/build_settings.sh"
+    fi
+
     for plugin_dir in "$ARKUI_BUILD"/plugins/*/; do
         copy_so_dir "$plugin_dir"
     done

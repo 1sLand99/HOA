@@ -40,16 +40,5 @@ set_target_properties(ohaudio PROPERTIES
     LINK_FLAGS "-Wl,-soname,libohaudio.so -nostartfiles -nostdlib"
 )
 
-# libsettings_napi.z.so — @ohos.settings NAPI module stub
-# Registers the "settings" NAPI module so that HAPs can
-# import settings from '@ohos.settings'.
-# Links against libarkui_android.so for NAPI symbols.
-add_library(settings_napi SHARED src/main/cpp/settings_stub.c)
-
-set_target_properties(settings_napi PROPERTIES
-    OUTPUT_NAME "settings_napi"
-    LINK_FLAGS "-Wl,-soname,libsettings_napi.so -nostartfiles"
-)
-
-target_link_directories(settings_napi PRIVATE ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
-target_link_libraries(settings_napi PRIVATE arkui_android)
+# libsettings_napi.z.so — now built by ArkUI-X plugins/settings/build_settings.sh
+# and synced via scripts/sync_arkui_x.sh
