@@ -206,6 +206,14 @@ if ! $SO_ONLY && ! $RES_ONLY; then
     log "========== systemres .abc =========="
     log "--- B1: 框架 UI 系统组件 .abc ---"
     SRC_ABC_DIR="$ARKUI_BUILD/arkui/ace_engine_cross"
+
+    # B0: Pure-ABC fallback compilation for modules not yet built by GN
+    # TODO: Remove once GN ohos_abc("settings") in declarative_frontend/BUILD.gn works
+    ES2ABC="$ARKUI_X_SRC/out/arkui-x/clang_x64/arkcompiler/ets_frontend/es2abc"
+    if [ -x "$ES2ABC" ] && [ -f "$ARKUI_X_SRC/foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/jsSettings.js" ]; then
+        mkdir -p "$SRC_ABC_DIR"
+        "$ES2ABC" --module --output "$SRC_ABC_DIR/settings.abc" "$ARKUI_X_SRC/foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/jsSettings.js" && log "B0: settings.abc compiled (fallback)"
+    fi
     if [ -d "$SRC_ABC_DIR" ]; then
         count=0
         for abc in "$SRC_ABC_DIR"/*.abc; do
