@@ -149,70 +149,70 @@
             android:process=":hap0"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity1"
             android:process=":hap1"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity2"
             android:process=":hap2"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity3"
             android:process=":hap3"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity4"
             android:process=":hap4"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity5"
             android:process=":hap5"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity6"
             android:process=":hap6"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity7"
             android:process=":hap7"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity8"
             android:process=":hap8"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".HoaAbilityActivity9"
             android:process=":hap9"
             android:exported="true"
             android:configChanges="orientation|keyboard|layoutDirection|screenSize|uiMode|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="stateHidden" />
 
         <service
             android:name=".hdc.HdcService"
