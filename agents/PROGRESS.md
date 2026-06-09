@@ -556,6 +556,24 @@ LinyBrowser（`meow.liny.browser.cat.uwu`）启动白屏，涉及两个独立问
 
 **已知局限**：GN 对新 `ohos_abc` 目标存在发现机制问题（`fileio` 同样未构建，`withenv` 因初始仓库就存在而正常）。根因待查，sync 脚本 fallback 覆盖。
 
+**架构讨论 — `@ohos.settings` 放在 `ace_engine` 还是 `plugins`？**
+
+当前 `jsSettings.js` 位于 `ace_engine/frameworks/bridge/declarative_frontend/engine/`，从逻辑归属看并非最优：
+
+| 位置 | 机制 | 适用场景 | 当前使用 |
+|------|------|---------|---------|
+| `ace_engine` `engine/` 目录 | `ohos_abc()` → 独立 .abc | 系统级纯 JS 模块 | `stateManagement`, `windowSizeLayoutBreakpoint`, `settings` |
+| `plugins/` + `plugin_lib.gni` | `plugin_lib` 模板 → NAPI .so | 需原生代码的应用面 API | HMS account/push/security、file/fs、bluetooth 等 70+ 插件 |
+| `plugins/` Pure-ABC | JS → ABC，无 .so | 纯 JS 应用面 API stub | `file/fileio/fileio.js`、`file/environment/environment.js`（源码已存在，构建集成待完善） |
+
+`@ohos.settings` 属于应用面 API（`@ohos.*` 命名空间），与 HMS 模块、`@ohos.fileio` 同级，逻辑上应归属 `plugins/`。选择 `ace_engine` 的主要原因是构建便利性——`ohos_abc()` 模板在 ace_engine 中已是成熟机制，而 plugins 缺少 Pure-ABC 的构建基础设施：
+
+- `plugins/plugin_lib.gni` 的 `plugin_lib` 模板假设产物为 .so（`ohos_shared_library`），不适用于无原生代码的 Pure-ABC 模块
+- `plugins/` 中尚未引用 `//build/templates/abc/ohos_abc.gni`，无法直接使用 `ohos_abc()` 目标
+- 之前尝试的 NAPI C stub 方案（`plugins/settings/settings_stub.c`）因 GN 无法发现新目录而被放弃
+
+**结论**：短期保持现状（ace_engine）合理，构建集成最简洁。长期若 plugins 补齐 Pure-ABC 构建能力（引入 `ohos_abc.gni`），`settings` 与 `fileio`、`environment` 等 Pure-ABC 模块可统一迁入 `plugins/`，使所有 `@ohos.*` 应用面 API stub 集中在一个仓库，不改动 ace_engine 的内部实现。
+
 ---
 
 ## 构建与工具链

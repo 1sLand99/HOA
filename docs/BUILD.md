@@ -137,7 +137,8 @@ bash build/prebuilts_download.sh --build-arkuix --skip-ssl
 ./build.sh --product-name arkui-x --target-os android
 ```
 
-> 首次构建耗时较长，后续增量构建较快。
+> 增量构建时，可通过 `--gn-args 'build_app_secondary_abi=false'` 跳过 32-bit arm
+> 编译（约节省 1/3 时间）。注意：首次/全量构建不能加此参数，否则缺少 host 工具链会失败。
 
 ---
 
