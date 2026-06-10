@@ -137,8 +137,10 @@ bash build/prebuilts_download.sh --build-arkuix --skip-ssl
 ./build.sh --product-name arkui-x --target-os android
 ```
 
-> 增量构建时，可通过 `--gn-args 'build_app_secondary_abi=false'` 跳过 32-bit arm
-> 编译（约节省 1/3 时间）。注意：首次/全量构建不能加此参数，否则缺少 host 工具链会失败。
+> 仅编译 arm64（跳过 arm 32-bit 和 x86_64 模拟器），节省约 60% 时间：
+> ```bash
+> ./build.sh --product-name arkui-x --target-os android --gn-args 'build_target_arch="arm64"'
+> ```
 
 ---
 
