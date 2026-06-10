@@ -619,7 +619,6 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 
 ### 中期
 
-- 完善 Ability 生命周期回调
 - 更多测试 HAP 样本验证
 - ~~**Native .so Phase 2**：完整 musl bridge~~ ✅ **已完成**（2026-05-29），pthread/stdio/dirent/setjmp 全链路验证通过
 - ~~**HDC DevEco Studio 支持**~~ ✅ **已完成**（2026-06-01），设备识别 + 完整部署流程（shell/file send/bm install）通过
