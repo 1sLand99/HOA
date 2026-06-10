@@ -649,5 +649,9 @@ ARKUI_BUILD=<path-to-build> ./scripts/sync_arkui_x.sh
 | `agents/native-so-compat-analysis.md` | musl/bionic 源码交叉验证（TLS/TCB 布局、struct pthread 字段偏移出处） |
 | `docs/BUILD.md` | 构建文档、build_all.sh 一键构建、musl bridge 编译 |
 | `docs/ARKUI-X_PATCHES.md` | ArkUI-X 6.1-Release 源码修改详细说明 |
+| `agents/harmonyos-ndk-api.md` | HarmonyOS NDK native C/C++ API 全景（OpenHarmony 97 域 + HMS 20 域，~2000 头文件） |
+| `agents/hms-api-coverage.md` | HMS ArkTS API 覆盖分析（174 个 API，分 A/B/C 三档优先级） |
+| `agents/pure-abc-module-build.md` | Pure-ABC 模块 GN 构建集成方案 |
+| `agents/sample-in-harmonyos-analysis.md` | sample_in_harmonyos 仓库 API 使用分析 |
 | `scripts/build_all.sh` | 全流程构建脚本（ArkUI-X → libb.so → sync → APK） |
 | `scripts/sync_arkui_x.sh` | 产物同步脚本 |

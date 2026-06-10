@@ -364,6 +364,6 @@
 
 ## 附录: 分析方法
 
-- OHOS API 声明文件来源: `/apps/harmony/sdk/default/openharmony/ets/api/`
+- OHOS API 声明文件来源: `$OHOS_SDK_HOME/sdk/default/openharmony/ets/api/`
 - ArkUI-X 插件来源: `plugins/plugin_lib.gni` + `foundation/arkui/ace_engine/interfaces/napi/kits/`
 - 已构建 .so 文件来源: `app/src/main/jniLibs/arm64-v8a/`

@@ -3,7 +3,7 @@
 HMS (Huawei Mobile Services) API 在 HarmonyOS SDK 中的声明情况，与 HOA 已有的 stub 覆盖对比。
 
 **分析日期**: 2026-06-10  
-**SDK 路径**: `/apps/harmony/sdk/default/hms/ets/api/`  
+**SDK 路径**: `$OHOS_SDK_HOME/sdk/default/hms/ets/api/`  
 **声明文件**: 174 个
 
 ## 已 stub 的 HMS API（5 个模块，覆盖 ~36 个 SDK 声明）

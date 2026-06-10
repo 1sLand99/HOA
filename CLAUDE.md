@@ -147,7 +147,7 @@ export MUSL=$ARKUI_X_SRC/third_party/musl
 # 仅 libb.so (修改了 bridge 代码)
 cd app/src/main/cpp
 MUSL=$ARKUI_X_SRC/third_party/musl bash build_musl_bridge.sh
-cd /src/HOA && ./gradlew assembleDebug
+cd - && ./gradlew assembleDebug
 
 # 仅 APK (修改了 Java/Kotlin 或 libb.so)
 ./gradlew assembleDebug
@@ -155,7 +155,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 修改了 ArkUI-X C++ 代码
 cd $ARKUI_X_SRC && ./build.sh --product-name arkui-x --target-os android
-cd /src/HOA && ./scripts/sync_arkui_x.sh --so-only && ./gradlew assembleDebug
+cd - && ./scripts/sync_arkui_x.sh --so-only && ./gradlew assembleDebug
 
 # 同步时可选择性复制
 ./scripts/sync_arkui_x.sh --so-only     # 仅 .so 文件
@@ -269,7 +269,7 @@ HOA 实现了 OHOS HDC daemon（TCP 8710 端口），使 DevEco Studio 可将 HO
 ## Git 仓库
 
 - **HOA**: `dev` 分支，remote origin
-- **ArkUI-X**: `/data/share/hoa2/arkui-x/`，remote `openharmony`
+- **ArkUI-X**: `$ARKUI_X_SRC`，remote `openharmony`
 - **ArkUI-X manifest**: `harmony-on-android/manifest`，branch `hoa-weekly` — 管理 8 个定制仓库 (ets_runtime, build, appframework, ace_engine/adapter/android, arkui/napi, plugins, musl, build_plugins)
 
 ---
