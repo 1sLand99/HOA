@@ -216,6 +216,22 @@ if ! $SO_ONLY && ! $RES_ONLY; then
         warn "systemres .abc 源目录不存在: $SRC_ABC_DIR"
     fi
 
+    # B1.1: @ohos.* Pure-ABC 模块 — 从 plugins/ 构建产出
+    log "--- B1.1: @ohos.* Pure-ABC 模块 ---"
+    PLUGIN_ABC_DIRS=(
+        "$ARKUI_BUILD/plugins/settings"
+        "$ARKUI_BUILD/plugins/file"
+    )
+    for abc_dir in "${PLUGIN_ABC_DIRS[@]}"; do
+        if [ -d "$abc_dir" ]; then
+            for abc in "$abc_dir"/*.abc; do
+                [ -f "$abc" ] || continue
+                abc_name=$(basename "$abc")
+                copy_file "$abc" "$SYSRES_ABC_DIR/$abc_name" && log "  $abc_name"
+            done
+        fi
+    done
+
     # B1.2: 框架核心 .abc — arkComponent.abc 和 jsEnumStyle.abc 在 ace_engine
     # 的 jsi 子模块中生成 (obj/ 目录), 不会输出到 ace_engine_cross/。
     # 这些文件负责注册 ThemeColorMode、NavPathStack 等内置 ETS 全局类型，
