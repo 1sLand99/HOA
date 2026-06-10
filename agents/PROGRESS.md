@@ -554,7 +554,7 @@ LinyBrowser（`meow.liny.browser.cat.uwu`）启动白屏，涉及两个独立问
 | `HOA` | `sync_arkui_x.sh`（+8 行）、`settings_stub.c`（删除） | fallback 编译 + 清理旧文件 |
 | `plugins` | 删除 `settings/` 目录 | 已迁移到 ace_engine |
 
-**已知局限**：GN 对新 `ohos_abc` 目标存在发现机制问题（`fileio` 同样未构建，`withenv` 因初始仓库就存在而正常）。根因待查，sync 脚本 fallback 覆盖。
+**已知局限**：~~GN 对新 `ohos_abc` 目标存在发现机制问题（`fileio` 同样未构建，`withenv` 因初始仓库就存在而正常）。根因待查，sync 脚本 fallback 覆盖。~~ **✅ 已修复 (2026-06-10)**：`ohos_abc("settings")` 未在 `declarative_js_engine`/`declarative_js_engine_ng` 的 deps 中引用，GN 不会构建未被依赖的目标。添加 `:settings` 到两处 deps 后 GN 正常输出 `settings.abc`，sync 脚本 fallback 已移除。
 
 **架构讨论 — `@ohos.settings` 放在 `ace_engine` 还是 `plugins`？**
 
