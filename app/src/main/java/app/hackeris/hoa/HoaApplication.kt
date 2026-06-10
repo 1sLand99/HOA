@@ -15,6 +15,7 @@ class HoaApplication : StageApplication() {
         private set
 
     override fun onCreate() {
+        ShareHelper.init(this)
         LogWriter.init(getExternalFilesDir(null) ?: filesDir)
         LogWriter.e(TAG, "========== HOA Application onCreate START ==========")
         LogWriter.e(TAG, "Process: ${android.os.Process.myPid()}  Name: ${currentProcessName()}")
