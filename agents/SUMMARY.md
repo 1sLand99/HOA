@@ -55,6 +55,7 @@
 - [arkui-x-build-system.md](arkui-x-build-system.md) — ArkUI-X GN 构建架构、仓库组织（直接复用 OHOS 核心代码）、平台动态发现机制、分层设计原则
 - [hms-hds-stub.md](hms-hds-stub.md) — **HDS Stub 解决方案（已实施）**：嵌入式 ABC mock（ViewPU 组合 HdsActionBar）+ ReplaceModuleThroughFeature 重定向，覆盖 ES import 和 HSP record 双路径；ABC-only 模式、export default 关键发现、SDK 声明 vs 编译器白名单双来源分析
 - [hms-api-coverage.md](hms-api-coverage.md) — **HMS API 覆盖分析**：对照 SDK 174 个 HMS 声明，5 个已 stub（覆盖 ~36 API）、按难度分类未覆盖的 ~138 API、优先级建议
+- [sample-in-harmonyos-analysis.md](sample-in-harmonyos-analysis.md) — **sample_in_harmonyos 分析**：华为官方代码工坊 App 的 API 覆盖分析，30+ `@kit.*` API 按 HOA 支持状态分类，含短期/中期建议路线
 - [pure-abc-module-build.md](pure-abc-module-build.md) — **Pure-ABC 模块构建集成**：settings/fileio/environment 从手动编译→GN deps 链修复→plugins 迁移的完整过程、当前架构、新增模块流程、JS stub 写法规范
 - [test-hap-analysis.md](test-hap-analysis.md) — 测试 HAP 样本完整分析: 内部结构、3 个模块记录、10 个外部依赖分类（@ohos: / @native: / L-class）、复杂度评估
 
