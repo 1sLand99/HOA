@@ -221,6 +221,7 @@ if ! $SO_ONLY && ! $RES_ONLY; then
     PLUGIN_ABC_DIRS=(
         "$ARKUI_BUILD/plugins/settings"
         "$ARKUI_BUILD/plugins/file"
+        "$ARKUI_BUILD/plugins/form"
     )
     for abc_dir in "${PLUGIN_ABC_DIRS[@]}"; do
         if [ -d "$abc_dir" ]; then

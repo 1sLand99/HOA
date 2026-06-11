@@ -96,6 +96,16 @@ class HapInstaller(private val context: Context) {
             }
         }
 
+        // Extract pkgContextInfo.json from HAP (contains all npm dependency info)
+        var pkgContextJson: String? = null
+        ZipFile(bundle.hapFile).use { zip ->
+            zip.getEntry("pkgContextInfo.json")?.let { entry ->
+                zip.getInputStream(entry).use { input ->
+                    pkgContextJson = input.reader().readText()
+                }
+            }
+        }
+
         // Patch extracted .so files: replace DT_NEEDED "libc.so" with
         // "libb.so" in-place so the musl ABI bridge resolves first.
         val libsDir = File(targetDir, "libs")
@@ -118,7 +128,7 @@ class HapInstaller(private val context: Context) {
             File(targetDir, "libs").walkTopDown().any { it.isFile && it.extension == "so" }
 
         // Write pkgContextInfo.json (required by StageAssetProvider.GetPkgJsonBuffer)
-        writePkgContextInfo(targetDir, fullModuleName, bundle.moduleConfig.type, hasNativeLibs)
+        writePkgContextInfo(targetDir, fullModuleName, bundle.moduleConfig.type, hasNativeLibs, pkgContextJson)
 
         val mainAbility = bundle.moduleConfig.mainElement.ifBlank {
             bundle.moduleConfig.abilities.firstOrNull()?.name ?: ""
@@ -133,13 +143,34 @@ class HapInstaller(private val context: Context) {
         )
     }
 
-    private fun writePkgContextInfo(targetDir: File, fullModuleName: String, moduleType: String, hasNativeLibs: Boolean) {
+    private fun writePkgContextInfo(targetDir: File, fullModuleName: String, moduleType: String, hasNativeLibs: Boolean, originalJson: String?) {
         // OHOS-format pkgContextInfo.json expected by js_runtime.cpp::ParsePkgContextInfoJson.
-        // Top-level key = module short name, value = {packageName, bundleName, moduleName, version, entryPath, isSO, dependencyAlias}
+        // If the HAP ships its own pkgContextInfo.json, use it as the base and fill in
+        // moduleName/bundleName for any entries that have them empty (npm dependencies).
         val lastDot = fullModuleName.lastIndexOf('.')
         val shortName = if (lastDot >= 0) fullModuleName.substring(lastDot + 1) else fullModuleName
         val bundleName = if (lastDot >= 0) fullModuleName.substring(0, lastDot) else ""
-        val json = JSONObject().apply {
+
+        val json = if (originalJson != null) {
+            try {
+                val orig = JSONObject(originalJson)
+                for (key in orig.keys()) {
+                    val item = orig.optJSONObject(key) ?: continue
+                    if (item.optString("moduleName", "").isEmpty()) {
+                        item.put("moduleName", fullModuleName)
+                    }
+                    if (item.optString("bundleName", "").isEmpty()) {
+                        item.put("bundleName", bundleName)
+                    }
+                }
+                orig
+            } catch (e: Exception) {
+                LogWriter.w(TAG, "Failed to parse HAP pkgContextInfo.json, generating fallback", e)
+                null
+            }
+        } else null
+
+        val finalJson = json ?: JSONObject().apply {
             put(shortName, JSONObject().apply {
                 put("packageName", shortName)
                 put("bundleName", bundleName)
@@ -150,7 +181,8 @@ class HapInstaller(private val context: Context) {
                 put("dependencyAlias", "")
             })
         }
-        File(targetDir, "pkgContextInfo.json").writeText(json.toString())
+
+        File(targetDir, "pkgContextInfo.json").writeText(finalJson.toString())
     }
 
     fun getInstalledHaps(): List<InstalledHap> {
