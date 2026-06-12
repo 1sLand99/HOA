@@ -72,7 +72,7 @@ ASFLAGS := \
 MUSL_THREAD_C := $(filter-out %/__unmapself.c %/clone.c %/__set_thread_area.c, $(wildcard $(MUSL)/src/thread/*.c))
 MUSL_THREAD_S := $(filter-out %/clone.s, $(wildcard $(MUSL)/src/thread/aarch64/*.s))
 
-MUSL_STDIO_C := $(filter-out %/__stdio_exit.c, $(wildcard $(MUSL)/src/stdio/*.c))
+MUSL_STDIO_C := $(filter-out %/__stdio_exit.c %/popen.c %/pclose.c, $(wildcard $(MUSL)/src/stdio/*.c))
 
 MUSL_INTERNAL_C := \
     $(MUSL)/src/internal/libc.c \
@@ -205,7 +205,8 @@ BRIDGE_SRCS := \
     $(SRCDIR)/elf_patch.c \
     $(SRCDIR)/elf_patch_jni.c \
     $(SRCDIR)/signal_bridge.c \
-    $(SRCDIR)/got_patch.c
+    $(SRCDIR)/got_patch.c \
+    $(SRCDIR)/popen_bridge.c
 
 # ── Object files ──────────────────────────────────────────────────────
 
