@@ -137,6 +137,16 @@ class HoaApplication : StageApplication() {
             LogWriter.e(TAG, "System.loadLibrary(\"hms_share\") — FAILED", e)
         }
 
+        // ArkUI Component bridge — registers NAPI module "ohos.arkui.component"
+        // so HAPs can import framework global ES values (BottomTabBarStyle etc.)
+        // from @kit.ArkUI.  Must be loaded before HAP code references them.
+        try {
+            System.loadLibrary("arkui_component")
+            LogWriter.e(TAG, "System.loadLibrary(\"arkui_component\") — SUCCESS")
+        } catch (e: UnsatisfiedLinkError) {
+            LogWriter.e(TAG, "System.loadLibrary(\"arkui_component\") — FAILED", e)
+        }
+
         // ——— HOA: redirect storage (Preferences/RDB/KV Store) to per-HAP dir ———
         // By default ArkUI-X sets filesDir to the app-level path so all HAPs
         // share files/preference/, files/database/, etc.  We override with the
