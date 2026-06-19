@@ -90,17 +90,117 @@ open class HoaAbilityActivity : StageActivity() {
         super.onPause()
     }
 
+    // ================================================================
+    // setRequestedOrientation — MIUI Activity-restart workaround
+    // ================================================================
+    //
+    // Background:
+    //   OHOS HAPs call setMainWindowOrientation(portrait/landscape/...)
+    //   expecting a lightweight, non-destructive window-level change.
+    //   The call chain is:
+    //
+    //     ArkTS: window.setMainWindowOrientation(portrait)
+    //       → NAPI: JsWindow::OnSetPreferredOrientation
+    //       → C++:  VirtualRSWindow::SetRequestedOrientation
+    //       → JNI:  SubWindowManagerJni::RequestOrientation
+    //       → Java: SubWindowManager.requestOrientation()
+    //               → mRootActivity.setRequestedOrientation(...)
+    //
+    //   On standard Android, configChanges="orientation|screenSize" in the
+    //   manifest means the Activity is NOT restarted — onConfigurationChanged
+    //   fires instead.  On MIUI (Xiaomi), however, setRequestedOrientation()
+    //   bypasses configChanges entirely: the OS destroys the Activity and
+    //   cold-starts a new process.  isChangingConfigurations is false during
+    //   this destroy, so it is indistinguishable from a "real" finish().
+    //
+    //   The process restart drops the entire ArkUI navigation stack and the
+    //   user sees the HAP home page instead of the current page.  Example:
+    //   BackdropBlurStyleTabBar in ui-examples — renders briefly then white
+    //   screen (before this fix) or snaps back to home (with onDestroy fix
+    //   alone).
+    //
+    // Workaround:
+    //   We compare the device's current orientation (from Configuration) with
+    //   the target orientation encoded in the requestedOrientation flag:
+    //
+    //     - Match (same orientation):  safe — forward to the real
+    //       setRequestedOrientation().  Calling it with the already-active
+    //       value is a no-op at the OS level and won't trigger a restart.
+    //
+    //     - Mismatch (real switch):  blocked — the MIUI restart would nuke
+    //       the ArkUI runtime.  Log a warning so the limitation is visible.
+    //
+    //   Most HAP calls are of the "match" variety (e.g. a portrait HAP
+    //   locking itself to portrait on an already-portrait device), so this
+    //   handles the common case correctly.
+    //
+    // Long-term fix:
+    //   SubWindowManager.java in ArkUI-X should avoid Activity-level
+    //   setRequestedOrientation() and use a lower-level API (e.g.
+    //   WindowManager / Display rotation) that doesn't trigger an Activity
+    //   lifecycle transition on MIUI.
+    // ================================================================
+    override fun setRequestedOrientation(requestedOrientation: Int) {
+        val config = resources.configuration
+        val currentOrientation = config.orientation
+        val targetOrientation = when (requestedOrientation) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT,
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT,
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT ->
+                android.content.res.Configuration.ORIENTATION_PORTRAIT
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE,
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE ->
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            else -> currentOrientation  // UNSPECIFIED, BEHIND, etc. — don't change
+        }
+
+        if (targetOrientation == currentOrientation) {
+            Log.e(TAG, "setRequestedOrientation($requestedOrientation) — already in target orientation, forwarding")
+            super.setRequestedOrientation(requestedOrientation)
+        } else {
+            Log.e(TAG, "setRequestedOrientation($requestedOrientation) — BLOCKED: " +
+                "current=$currentOrientation target=$targetOrientation. " +
+                "Would trigger MIUI Activity restart and lose ArkUI navigation state.")
+        }
+    }
+
+    // ================================================================
+    // onDestroy — only kill process on "real" destroy, not config changes
+    // ================================================================
+    //
+    // Why we kill the process on destroy:
+    //   Each HAP runs in an isolated process (:hap0–:hap9).  The ArkUI-X
+    //   StageApplication / ResourceManager is process-global and
+    //   AddResource() fails if called a second time with the same path.
+    //   Killing the process guarantees a clean slate for the next launch.
+    //
+    // Why we DON'T kill on config changes:
+    //   When isChangingConfigurations == true, the OS is destroying the
+    //   Activity temporarily (e.g. physical device rotation) and will
+    //   recreate it immediately in the same process.  Killing here would
+    //   leave the user staring at a dead window.
+    //
+    // NOTE: setRequestedOrientation() on MIUI triggers a destroy with
+    //       isChangingConfigurations == FALSE (see setRequestedOrientation
+    //       override above).  That path is blocked before it reaches
+    //       onDestroy, so this check alone was not sufficient — the
+    //       setRequestedOrientation workaround is also required.
+    // ================================================================
     override fun onDestroy() {
-        Log.e(TAG, "onDestroy — UIAbility.onDestroy() should fire")
+        Log.e(TAG, "onDestroy — UIAbility.onDestroy() should fire, isChangingConfigurations=$isChangingConfigurations")
         val slot = intent.getIntExtra("PROCESS_SLOT", -1)
         if (slot >= 0) {
             ProcessSlotManager.releaseSlot(this, slot)
             Log.e(TAG, "Process slot $slot released")
         }
         super.onDestroy()
-        // Kill the process so the next launch gets a fresh ArkUI-X runtime.
-        // The ResourceManager in StageApplication is process-global and
-        // AddResource() fails if called again with the same path.
+        if (isChangingConfigurations) {
+            Log.e(TAG, "onDestroy — skipping killProcess (config change, activity will be recreated)")
+            return
+        }
         android.os.Process.killProcess(android.os.Process.myPid())
     }
 
