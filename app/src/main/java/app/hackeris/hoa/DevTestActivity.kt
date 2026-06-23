@@ -182,22 +182,9 @@ class DevTestActivity : AppCompatActivity() {
             return
         }
 
-        val slot = ProcessSlotManager.allocateSlot(this, File(filesDir, "hap/$bundle.$module").absolutePath)
-        if (slot < 0) {
+        if (ProcessSlotManager.launchHap(this, bundle, module, ability) < 0) {
             Toast.makeText(this, getString(R.string.toast_slots_full_fmt, ProcessSlotManager.MAX_SLOTS), Toast.LENGTH_LONG).show()
-            Log.w(TAG, "All process slots occupied")
-            return
         }
-        Log.e(TAG, "Launching HAP slot=$slot bundle=$bundle/$module/$ability")
-        val intent = Intent().apply {
-            setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
-            putExtra("BUNDLE_NAME", bundle)
-            putExtra("MODULE_NAME", module)
-            putExtra("ABILITY_NAME", ability)
-            putExtra("PROCESS_SLOT", slot)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-        }
-        startActivity(intent)
     }
 
     private fun refreshStatus() {

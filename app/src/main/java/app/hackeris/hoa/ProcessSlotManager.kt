@@ -1,12 +1,39 @@
 package app.hackeris.hoa
 
 import android.content.Context
+import android.content.Intent
 import android.os.Process
 import java.io.File
 
 object ProcessSlotManager {
 
     const val MAX_SLOTS = 10
+
+    /** Allocate a slot and start HoaAbilityActivity{N}.  Shared by shortcut,
+     *  list-click, and DevTest launch paths.  Returns the slot number, or
+     *  -1 if all slots are occupied. */
+    fun launchHap(context: Context,
+                  bundleName: String,
+                  moduleName: String,
+                  abilityName: String): Int {
+        val fullModuleName = "$bundleName.$moduleName"
+        val contentDir = File(context.filesDir, "hap/$fullModuleName").absolutePath
+        val slot = allocateSlot(context, contentDir)
+        if (slot < 0) return -1
+        val forward = Intent().apply {
+            setClassName(context.packageName,
+                "${context.packageName}.HoaAbilityActivity$slot")
+            putExtra("BUNDLE_NAME", bundleName)
+            putExtra("MODULE_NAME", moduleName)
+            putExtra("ABILITY_NAME", abilityName)
+            putExtra("PROCESS_SLOT", slot)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                     Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
+                     Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+        }
+        context.startActivity(forward)
+        return slot
+    }
     private const val SLOT_PREFIX = "hap_slot_"
     private const val RESERVED_PREFIX = "RESERVED|"
     private const val RESERVATION_TIMEOUT_MS = 30_000L

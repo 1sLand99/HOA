@@ -115,10 +115,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
+        // Shortcut launch: MIUI may rewrite the pinned shortcut intent from
+        // HoaShortcutActivity → MainActivity.  If we see shortcut extras,
+        // allocate a slot and forward regardless of the action.
+        val shortcutBundle = intent.getStringExtra("BUNDLE_NAME")
+        if (shortcutBundle != null) {
+            val module = intent.getStringExtra("MODULE_NAME") ?: "entry"
+            val ability = intent.getStringExtra("ABILITY_NAME") ?: "EntryAbility"
+            handleShortcutLaunch(shortcutBundle, module, ability)
+            return
+        }
+
         val uri: Uri? = when (intent.action) {
             Intent.ACTION_VIEW -> intent.data
             Intent.ACTION_SEND -> {
-                // Shared file comes via EXTRA_STREAM
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(Intent.EXTRA_STREAM)
             }
@@ -127,6 +137,12 @@ class MainActivity : AppCompatActivity() {
         if (uri != null) {
             LogWriter.e(TAG, "Handling HAP from intent: action=${intent.action} uri=$uri")
             previewAndInstallHap(uri)
+        }
+    }
+
+    private fun handleShortcutLaunch(bundle: String, module: String, ability: String) {
+        if (ProcessSlotManager.launchHap(this, bundle, module, ability) < 0) {
+            Toast.makeText(this, getString(R.string.dialog_no_slots_msg, ProcessSlotManager.MAX_SLOTS), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -415,26 +431,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchHap(hap: InstalledHap) {
-        val slot = ProcessSlotManager.allocateSlot(this, hap.contentDir.absolutePath)
-        if (slot < 0) {
+        if (ProcessSlotManager.launchHap(this, hap.bundleName, hap.moduleName, hap.mainAbility) < 0) {
             AlertDialog.Builder(this)
                 .setTitle(getString(R.string.dialog_no_slots_title))
                 .setMessage(getString(R.string.dialog_no_slots_msg, ProcessSlotManager.MAX_SLOTS))
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
-            LogWriter.w(TAG, "All ${ProcessSlotManager.MAX_SLOTS} process slots occupied")
-            return
         }
-        LogWriter.e(TAG, "Launching HAP: ${hap.bundleName}/${hap.moduleName} ability=${hap.mainAbility} slot=$slot")
-        val intent = Intent().apply {
-            setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
-            putExtra("BUNDLE_NAME", hap.bundleName)
-            putExtra("MODULE_NAME", hap.moduleName)
-            putExtra("ABILITY_NAME", hap.mainAbility)
-            putExtra("PROCESS_SLOT", slot)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-        }
-        startActivity(intent)
     }
 
     private fun showLongPressMenu(anchor: View, hap: InstalledHap) {

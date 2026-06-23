@@ -18,37 +18,13 @@ class HoaShortcutActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         val bundleName = intent.getStringExtra("BUNDLE_NAME") ?: return finish()
         val moduleName = intent.getStringExtra("MODULE_NAME") ?: return finish()
         val abilityName = intent.getStringExtra("ABILITY_NAME") ?: return finish()
-
-        val slot = ProcessSlotManager.allocateSlot(this)
+        val slot = ProcessSlotManager.launchHap(this, bundleName, moduleName, abilityName)
         if (slot < 0) {
-            val maxSlots = ProcessSlotManager.MAX_SLOTS
-            Toast.makeText(
-                this,
-                getString(R.string.dialog_no_slots_msg, maxSlots),
-                Toast.LENGTH_LONG
-            ).show()
-            Log.w(TAG, "Shortcut launch failed: all $maxSlots slots occupied")
-            finish()
-            return
+            Toast.makeText(this, getString(R.string.dialog_no_slots_msg, ProcessSlotManager.MAX_SLOTS), Toast.LENGTH_LONG).show()
         }
-
-        Log.e(TAG, "Shortcut relay: $bundleName/$moduleName/$abilityName → slot $slot")
-
-        val forward = Intent().apply {
-            setClassName(packageName, "${packageName}.HoaAbilityActivity$slot")
-            putExtra("BUNDLE_NAME", bundleName)
-            putExtra("MODULE_NAME", moduleName)
-            putExtra("ABILITY_NAME", abilityName)
-            putExtra("PROCESS_SLOT", slot)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
-                     Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
-                     Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-        }
-        startActivity(forward)
         finish()
     }
 
