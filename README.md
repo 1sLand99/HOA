@@ -95,7 +95,7 @@ repo init (HOA manifest) → prebuilts_download.sh → build.sh → build_musl_b
 - **获取 HAP**：可前往 [sydxky.cn](https://sydxky.cn/) 下载 HAP 应用包。由于 HOA 尚在开发中，大部分 HAP 暂无法正常运行，仅建议用于测试。
 - **QQ 群**：欢迎加入交流群讨论。
 
-<img src="media/qq_qrcode.png" alt="QQ群二维码" width="320">
+<img src="media/qq_qrcode.jpg" alt="QQ群二维码" width="280">
 
 ## 相关文档
 
