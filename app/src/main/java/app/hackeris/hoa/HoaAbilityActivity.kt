@@ -74,6 +74,7 @@ open class HoaAbilityActivity : StageActivity() {
         super.onPostCreate(savedInstanceState)
         // Apply HAP metadata (title + icon) AFTER super.onCreate() so that
         // any title/task-description set by StageActivity is overwritten.
+        applyWindowInsetsPadding()
         val bundleName = intent.getStringExtra("BUNDLE_NAME") ?: "app.hackeris.harmonyexample"
         val moduleName = intent.getStringExtra("MODULE_NAME") ?: "entry"
         val abilityName = intent.getStringExtra("ABILITY_NAME") ?: "EntryAbility"
@@ -202,6 +203,22 @@ open class HoaAbilityActivity : StageActivity() {
             return
         }
         android.os.Process.killProcess(android.os.Process.myPid())
+    }
+
+    // Apply Android system window insets (status bar, navigation bar) as
+    // padding on the root content view so ArkUI content doesn't render under
+    // the system bars.  Without this, HAPs using expandSafeArea(TOP) bleed
+    // into the status bar and become unreadable / unclickable.
+    private fun applyWindowInsetsPadding() {
+        val rootView = window.decorView.findViewById<android.view.View>(android.R.id.content)
+        if (rootView != null) {
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
+                val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                view.setPadding(0, statusBars.top, 0, navBars.bottom)
+                insets
+            }
+        }
     }
 
     override fun onBackPressed() {
