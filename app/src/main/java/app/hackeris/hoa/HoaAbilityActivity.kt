@@ -210,12 +210,29 @@ open class HoaAbilityActivity : StageActivity() {
     // the system bars.  Without this, HAPs using expandSafeArea(TOP) bleed
     // into the status bar and become unreadable / unclickable.
     private fun applyWindowInsetsPadding() {
+        // Pick up the activity's window background colour and apply it to the
+        // status bar and navigation bar so they blend with the HAP's own UI
+        // background instead of showing the system-default colour.
+        val ta = theme.obtainStyledAttributes(intArrayOf(android.R.attr.windowBackground))
+        val bgDrawable = ta.getDrawable(0)
+        ta.recycle()
+        if (bgDrawable is android.graphics.drawable.ColorDrawable) {
+            val bgColor = bgDrawable.color
+            window.statusBarColor = bgColor
+            window.navigationBarColor = bgColor
+            // Choose light/dark status bar icons based on background luminance
+            val luminance = 0.299 * android.graphics.Color.red(bgColor) +
+                            0.587 * android.graphics.Color.green(bgColor) +
+                            0.114 * android.graphics.Color.blue(bgColor)
+            val insetsController = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+            insetsController.isAppearanceLightStatusBars = luminance > 128
+        }
+
         val rootView = window.decorView.findViewById<android.view.View>(android.R.id.content)
         if (rootView != null) {
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
                 val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
-                view.setPadding(0, statusBars.top, 0, navBars.bottom)
+                view.setPadding(0, statusBars.top, 0, 0)
                 insets
             }
         }
