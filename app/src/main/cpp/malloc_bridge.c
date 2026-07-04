@@ -448,16 +448,25 @@ int setenv(const char *name, const char *value, int overwrite)
 }
 
 // ── fdopen ──────────────────────────────────────────────────────────────
-// musl's fdopen calls malloc to allocate the FILE structure.  Wrap with
-// TLS switching.
+// Must return a MUSL FILE*, not a bionic FILE*.  Bionic FILE* has a
+// different struct layout — calling musl's fclose/fputs/fgets on it
+// dereferences wrong offsets (e.g. f->close at offset 24 → NULL → SIGSEGV).
+//
+// Use musl's internal __fmodeflags + __fdopenx, which are compiled into
+// libb.so.  -Wl,-Bsymbolic ensures internal resolution to libb.so's copies.
 
-static FILE *(*bionic_fdopen)(int, const char *) = NULL;
+// Flags from musl stdio_impl.h (F_NORD=4, F_NOWR=8)
+extern int __fmodeflags(const char *mode, int *file_flags);
+extern FILE *__fdopenx(int fd, int flags);
 
 FILE *fdopen(int fd, const char *mode)
 {
+    int file_flags = 0;
+    if (__fmodeflags(mode, &file_flags) < 0) return NULL;
+
     uintptr_t saved = 0;
     enter_bionic_alloc(&saved);
-    FILE *r = bionic_fdopen(fd, mode);
+    FILE *r = __fdopenx(fd, file_flags);
     leave_bionic_alloc(saved);
     return r;
 }
@@ -622,8 +631,6 @@ static void __malloc_bridge_init(void)
         dlsym(RTLD_NEXT, "putenv");
     bionic_setenv = (int (*)(const char *, const char *, int))
         dlsym(RTLD_NEXT, "setenv");
-    bionic_fdopen = (FILE *(*)(int, const char *))
-        dlsym(RTLD_NEXT, "fdopen");
 
     // Resolve bionic's unsetenv/iconv for TLS-switching wrappers.
     bionic_unsetenv = (int (*)(const char *))
