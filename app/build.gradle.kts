@@ -15,8 +15,8 @@ android {
         //   versionName = YY.M.D.B  (年.月.日.当日构建次数)
         //   versionCode = YYMMDDBB  (年年月月日日次次，共 9 位)
         // 示例: 26.5.29.1 → 260529001 (2026-05-29 第 1 次构建)
-        versionCode = 260627001
-        versionName = "26.6.27.1"
+        versionCode = 260705001
+        versionName = "26.7.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
