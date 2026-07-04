@@ -204,8 +204,10 @@ struct pthread *__musl_bridge_self(void)
 // different memory locations → errno mismatch → musl code sees errno=0
 // after a bionic failure.
 //
-// Fix: resolve bionic's __errno_location at init time and delegate.
-
+// Eagerly resolved in __musl_bridge_init (main thread, before any musl
+// threads exist).  dlsym(RTLD_NEXT) inside a musl thread segfaults because
+// the dynamic linker tries to access bionic per-thread state that doesn't
+// exist for musl-created threads.
 static int *(*bionic_errno_loc)(void);
 
 // Recursion guard: dlsym() on some custom ROMs may internally call
@@ -216,6 +218,7 @@ static volatile int errno_loc_resolving = 0;
 int *__errno_location(void)
 {
     if (!bionic_errno_loc) {
+        // Fallback: lazy init (only reached if constructor was skipped)
         if (__atomic_load_n(&errno_loc_resolving, __ATOMIC_ACQUIRE)) {
             return &__musl_bridge_self()->errno_val;
         }
@@ -324,4 +327,10 @@ static void __musl_bridge_init(void)
 
     // Capture musl's global_locale address (offset 56).
     global_locale_ptr = (void *)(&__libc + 56);
+
+    // Resolve bionic's __errno_location eagerly in the main thread.
+    // Lazy resolution (first call to __errno_location) can happen in a
+    // musl-created thread where dlsym(RTLD_NEXT) chokes on TLS setup →
+    // SIGSEGV.  Doing it here avoids the race entirely.
+    bionic_errno_loc = (int *(*)(void))dlsym(RTLD_NEXT, "__errno_location");
 }

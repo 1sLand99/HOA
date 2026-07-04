@@ -26,6 +26,8 @@ CFLAGS_MUSL := \
 # Add -DMALLOC_CANARY_DEBUG for heap corruption detection (debug only)
 # Add -DMALLOC_PADDING=N to add N bytes of padding per allocation
 CFLAGS_BRIDGE := \
+    -DMALLOC_CANARY_DEBUG \
+    -DMALLOC_CANARY_MINIMAL \
     -isystem $(SYSROOT)/usr/include \
     -isystem $(SYSROOT)/usr/include/aarch64-linux-android
 
@@ -206,7 +208,7 @@ BRIDGE_SRCS := \
     $(SRCDIR)/elf_patch_jni.c \
     $(SRCDIR)/signal_bridge.c \
     $(SRCDIR)/got_patch.c \
-    $(SRCDIR)/popen_bridge.c
+    $(SRCDIR)/popen_bridge.c \
 
 # ── Object files ──────────────────────────────────────────────────────
 

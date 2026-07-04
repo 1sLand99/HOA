@@ -89,6 +89,21 @@
         realloc;
         calloc;
 
+        /* strdup / realpath / putenv / setenv / fdopen — also internally
+         * allocate via malloc. Must be exported so musl threads use the
+         * TLS-switching versions instead of falling through to bionic
+         * (which would call bionic malloc directly and corrupt scudo). */
+        strdup;
+        realpath;
+        putenv;
+        setenv;
+        fdopen;
+        unsetenv;
+        iconv_open;
+        iconv_close;
+        iconv;
+        posix_memalign;
+
         /* bridge API */
         __musl_bridge_self;
         __musl_bridge_register;
