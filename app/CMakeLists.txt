@@ -57,5 +57,19 @@ target_include_directories(rawfile_z PRIVATE
 
 target_link_libraries(rawfile_z PRIVATE log)
 
+# libbundle_ndk.z.so — OHOS Bundle native API bridge
+# Provides OH_NativeBundle_* functions for querying app info from module.json.
+# SONAME must be "libbundle_ndk.z.so" to match OHOS HAP DT_NEEDED.
+add_library(bundle_ndk_z SHARED src/main/cpp/bundle_bridge.c)
+
+set_target_properties(bundle_ndk_z PROPERTIES
+    OUTPUT_NAME "bundle_ndk.z"
+    LINK_FLAGS "-Wl,-soname,libbundle_ndk.z.so -nostartfiles"
+)
+
+target_include_directories(bundle_ndk_z PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/main/cpp/bundle
+)
+
 # libsettings_napi.z.so — now built by ArkUI-X plugins/settings/build_settings.sh
 # and synced via scripts/sync_arkui_x.sh
