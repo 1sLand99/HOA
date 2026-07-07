@@ -1,0 +1,3 @@
+#ifndef HOARD_APP_TARGET_SDK_H
+#define HOARD_APP_TARGET_SDK_H
+#endif

@@ -40,5 +40,22 @@ set_target_properties(ohaudio PROPERTIES
     LINK_FLAGS "-Wl,-soname,libohaudio.so -nostartfiles -nostdlib"
 )
 
+# librawfile.z.so — OHOS RawFile native API bridge
+# Provides OH_ResourceManager_* functions for reading HAP rawfile resources.
+# Maps rawfile paths to the HAP extraction directory on the filesystem.
+# SONAME must be "librawfile.z.so" to match OHOS HAP DT_NEEDED.
+add_library(rawfile_z SHARED src/main/cpp/rawfile_bridge.cpp)
+
+set_target_properties(rawfile_z PROPERTIES
+    OUTPUT_NAME "rawfile.z"
+    LINK_FLAGS "-Wl,-soname,librawfile.z.so -nostartfiles"
+)
+
+target_include_directories(rawfile_z PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/main/cpp/rawfile
+)
+
+target_link_libraries(rawfile_z PRIVATE log)
+
 # libsettings_napi.z.so — now built by ArkUI-X plugins/settings/build_settings.sh
 # and synced via scripts/sync_arkui_x.sh
